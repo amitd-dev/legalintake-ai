@@ -8,7 +8,7 @@ const money = (v: string | number) =>
 
 const HAIR = "border-white/[0.06]";
 const PANEL = `rounded-lg border ${HAIR} bg-[#101012]`;
-const LABEL = "text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-500";
+const LABEL = "whitespace-nowrap text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-500";
 
 /* ---------- sparkline (real hourly leads) ---------- */
 function Sparkline({ series }: { series: number[] }) {
@@ -72,7 +72,7 @@ function Cell({
 export function KpiCards({ kpis, hourly }: { kpis: DashboardData["kpis"]; hourly: number[] }) {
   return (
     <div className={`${PANEL} flex divide-x divide-white/[0.06]`}>
-      <Cell label="Leads · today" value={kpis.leads_today} sub="last 12h trend">
+      <Cell label="Leads today" value={kpis.leads_today} sub="12h trend">
         <Sparkline series={hourly} />
       </Cell>
       <Cell label="Qualified" value={kpis.qualified_today} sub="fit + consult-ready" />

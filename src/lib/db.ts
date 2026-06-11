@@ -9,11 +9,15 @@ declare global {
 
 export function getPool(): Pool {
   if (!global.__pgPool) {
-    const url = process.env.DATABASE_URL;
-    if (!url) throw new Error("DATABASE_URL is not configured");
+    const raw = process.env.DATABASE_URL;
+    if (!raw) throw new Error("DATABASE_URL is not configured");
+    // Strip sslmode from the URL: pg's connection-string parser would otherwise
+    // override our ssl config and reject DO's cluster CA as self-signed.
+    const url = new URL(raw);
+    url.searchParams.delete("sslmode");
     global.__pgPool = new Pool({
-      connectionString: url,
-      ssl: { rejectUnauthorized: false }, // DO managed PG uses a cluster CA; require encrypted transport
+      connectionString: url.toString(),
+      ssl: { rejectUnauthorized: false }, // encrypted transport; DO uses a cluster CA
       max: 3 // serverless: keep the per-instance footprint small
     });
   }

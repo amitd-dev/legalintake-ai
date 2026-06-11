@@ -12,6 +12,7 @@ export default function ChatWindow({ firmName }: { firmName: string }) {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -30,12 +31,13 @@ export default function ChatWindow({ firmName }: { firmName: string }) {
       const r = await fetch("/api/chat", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ messages: next })
+        body: JSON.stringify({ messages: next, conversationId })
       });
       const data = await r.json();
       if (!r.ok || data.error) {
         setError(data.error || "Connection issue — please try again.");
       } else {
+        if (data.conversationId) setConversationId(data.conversationId);
         setMessages((m) => [...m, { role: "assistant", content: data.reply }]);
       }
     } catch {

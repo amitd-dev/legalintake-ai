@@ -15,6 +15,7 @@ export type DashboardData = {
     case_type: string | null;
     message_count: string;
   }[];
+  hourly: number[];
   generated_at: string;
 };
 

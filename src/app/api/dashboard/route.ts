@@ -11,7 +11,7 @@ export async function GET() {
     return NextResponse.json({ error: "database not configured" }, { status: 503 });
   }
   try {
-    const [kpis, funnel, events, conversations] = await Promise.all([
+    const [kpis, funnel, events, conversations, hourly] = await Promise.all([
       query<{ leads_today: string; qualified_today: string; booked_today: string; pipeline_value: string }>(`
         select
           count(*) filter (where created_at >= date_trunc('day', now()))                                     as leads_today,
@@ -35,6 +35,13 @@ export async function GET() {
                (select count(*) from messages m where m.conversation_id = c.id) as message_count
         from conversations c left join leads l on l.id = c.lead_id
         order by c.started_at desc limit 10
+      `),
+      // real leads-per-hour series for the last 12 hours (sparkline)
+      query<{ bucket: string; n: string }>(`
+        select to_char(h, 'YYYY-MM-DD"T"HH24:00') as bucket, coalesce(count(l.id), 0)::text as n
+        from generate_series(date_trunc('hour', now()) - interval '11 hours', date_trunc('hour', now()), interval '1 hour') h
+        left join leads l on date_trunc('hour', l.created_at) = h
+        group by h order by h
       `)
     ]);
 
@@ -43,6 +50,7 @@ export async function GET() {
       funnel: funnel[0],
       events,
       conversations,
+      hourly: hourly.map((h) => Number(h.n)),
       generated_at: new Date().toISOString()
     });
   } catch (e) {

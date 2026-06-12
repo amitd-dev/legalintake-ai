@@ -41,11 +41,13 @@ const AGENT_DEFS = [
   { key: "intake", name: "Intake Agent", proc: "intake.agent", desc: "Client intake · qualification · booking" },
   { key: "notetaker", name: "Note-Taker Agent", proc: "notes.agent", desc: "Consultation transcripts → case notes" },
   { key: "paralegal", name: "Paralegal Agent", proc: "forms.agent", desc: "USCIS form preparation (G-28)" },
-  { key: "drafting", name: "Drafting Agent", proc: "draft.agent", desc: "Demand letters · NDAs · engagement letters" }
+  { key: "drafting", name: "Drafting Agent", proc: "draft.agent", desc: "Demand letters · NDAs · engagement letters" },
+  { key: "research", name: "Research Agent", proc: "research.agent", desc: "Legal memos · citation checklists" }
 ] as const;
 
 function agentKeyFor(e: Ev): string {
   if (e.type === "note_recorded") return "notetaker";
+  if (e.type === "research_memo") return "research";
   if (e.type === "document_generated") {
     return (e.payload as Record<string, unknown>).agent === "drafting" ? "drafting" : "paralegal";
   }
@@ -63,6 +65,7 @@ function line(e: Ev): string {
     case "escalation": return `ESCALATED to human — ${String(p.reason || "").slice(0, 60)}`;
     case "note_recorded": return `case notes filed — ${p.name || "client"}${Array.isArray(p.forms_needed) && p.forms_needed.length ? ` · needs ${p.forms_needed.join(", ")}` : ""}`;
     case "document_generated": return `${p.doc_type || "document"} drafted — ${p.name || "client"}`;
+    case "research_memo": return `memo filed — "${String(p.question || "").slice(0, 50)}" · ${p.jurisdiction || ""} · ${p.authorities ?? 0} authorities`;
     default: return e.type.replaceAll("_", " ");
   }
 }
@@ -227,7 +230,7 @@ export default function AgentOS() {
                 {feed.map((e) => (
                   <p key={e.id} className={`truncate rounded px-1 -mx-1 ${fresh.has(e.id) ? "ev-new" : ""}`}>
                     <span className="text-zinc-600">{t(e.created_at)}</span>{" "}
-                    <span className={e.type === "escalation" ? "text-red-300" : e.type.includes("qualified") || e.type === "booking_created" || e.type === "document_generated" ? "text-emerald-300/90" : "text-zinc-400"}>
+                    <span className={e.type === "escalation" ? "text-red-300" : e.type.includes("qualified") || e.type === "booking_created" || e.type === "document_generated" || e.type === "research_memo" ? "text-emerald-300/90" : "text-zinc-400"}>
                       {line(e)}
                     </span>
                   </p>

@@ -25,13 +25,15 @@ async function callApi(
   system: string,
   messages: ChatMessage[],
   tools: ToolDefinition[],
-  maxTokens: number
+  maxTokens: number,
+  serverTools: unknown[] = []
 ): Promise<ApiResponse> {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) throw new Error("ANTHROPIC_API_KEY is not configured");
 
   const body: Record<string, unknown> = { model, max_tokens: maxTokens, system, messages };
-  if (tools.length) body.tools = tools;
+  const allTools = [...tools, ...serverTools];
+  if (allTools.length) body.tools = allTools;
 
   const r = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -62,13 +64,15 @@ export async function runAgent(opts: {
   tools?: ToolDefinition[];
   handlers?: Record<string, ToolHandler>;
   maxTokens?: number;
+  /** Anthropic server-side tools (e.g. web search) — executed by the API, no handler needed. */
+  serverTools?: unknown[];
 }): Promise<{ reply: string; toolsUsed: string[] }> {
   const { system, tools = [], handlers = {}, maxTokens = 800 } = opts;
   const convo: ChatMessage[] = [...opts.messages];
   const toolsUsed: string[] = [];
 
   for (let round = 0; round < 6; round++) {
-    const res = await callApi(system, convo, tools, maxTokens);
+    const res = await callApi(system, convo, tools, maxTokens, opts.serverTools || []);
     const toolUses = res.content.filter((b): b is Extract<ContentBlock, { type: "tool_use" }> => b.type === "tool_use");
 
     if (res.stop_reason !== "tool_use" || toolUses.length === 0) {

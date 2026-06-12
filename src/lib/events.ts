@@ -10,6 +10,7 @@ export type EventType =
   | "escalation"
   | "note_recorded"
   | "document_generated"
+  | "research_memo"
   | "agent_error";
 
 export async function logEvent(type: EventType, payload: Record<string, unknown>): Promise<void> {

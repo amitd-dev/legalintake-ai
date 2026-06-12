@@ -77,8 +77,19 @@ create table if not exists documents (
 );
 create index if not exists idx_documents_lead on documents(lead_id, created_at desc);
 
+-- Research Agent: structured legal research memos (AI first-pass, attorney must verify)
+create table if not exists research_memos (
+  id uuid primary key default gen_random_uuid(),
+  lead_id uuid references leads(id) on delete set null,
+  question text not null,
+  jurisdiction text not null,
+  memo jsonb not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_memos_created on research_memos(created_at desc);
+
 -- ============================================================================
--- FUTURE AGENTS (Phases 8-11) — designed-in, created when each phase begins.
+-- FUTURE AGENTS (Phases 9-11) — designed-in, created when each phase begins.
 -- Architecture rule: every agent writes to the shared `events` table above,
 -- so the dashboard stays the single pane of glass. One database, one event
 -- stream, many agents.

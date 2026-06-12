@@ -60,7 +60,10 @@ export async function GET() {
           count(*) filter (where type = 'document_generated' and payload->>'agent' = 'drafting'
                              and created_at >= date_trunc('day', now()))            as drafting_today,
           count(*) filter (where type = 'document_generated' and payload->>'agent' = 'drafting') as drafting_total,
-          max(created_at) filter (where type = 'document_generated' and payload->>'agent' = 'drafting') as drafting_last
+          max(created_at) filter (where type = 'document_generated' and payload->>'agent' = 'drafting') as drafting_last,
+          count(*) filter (where type = 'research_memo' and created_at >= date_trunc('day', now())) as research_today,
+          count(*) filter (where type = 'research_memo')                            as research_total,
+          max(created_at) filter (where type = 'research_memo')                     as research_last
         from events
       `),
       // yesterday's counts for honest day-over-day deltas

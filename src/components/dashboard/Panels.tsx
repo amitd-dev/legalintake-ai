@@ -101,7 +101,8 @@ export function AgentRoster({ agents }: { agents: Record<string, string | null> 
     { name: "Intake Agent", role: "Client intake, qualification & scheduling", k: "intake" },
     { name: "Note-Taker Agent", role: "Consultation transcripts → case notes", k: "notetaker" },
     { name: "Paralegal Agent", role: "USCIS form preparation (G-28)", k: "paralegal" },
-    { name: "Drafting Agent", role: "Demand letters, engagement letters, NDAs", k: "drafting" }
+    { name: "Drafting Agent", role: "Demand letters, engagement letters, NDAs", k: "drafting" },
+    { name: "Research Agent", role: "Legal research memos + citation checklist", k: "research" }
   ];
   return (
     <div className={PANEL}>
@@ -148,7 +149,8 @@ export function AgentRoster({ agents }: { agents: Record<string, string | null> 
 /* agent attribution for each log line */
 function agentFor(type: string): string {
   if (type === "note_recorded") return "NOTE-TAKER";
-  if (type === "document_generated") return "PARALEGAL";
+  if (type === "document_generated") return "DOCS";
+  if (type === "research_memo") return "RESEARCH";
   return "INTAKE";
 }
 
@@ -221,6 +223,8 @@ function eventMeta(type: string, p: Record<string, unknown>) {
       return { tag: "NOTES", tagCls: "bg-violet-400/10 text-violet-300", text: `Consultation notes — ${p.name ?? "client"}${Array.isArray(p.forms_needed) && p.forms_needed.length ? ` · forms: ${(p.forms_needed as string[]).join(", ")}` : ""}`, right: null };
     case "document_generated":
       return { tag: "DOCUMENT", tagCls: "bg-amber-400/10 text-amber-300", text: `${p.doc_type ?? "Document"} drafted — ${p.name ?? "client"}`, right: null };
+    case "research_memo":
+      return { tag: "RESEARCH", tagCls: "bg-violet-400/10 text-violet-300", text: `Memo — ${p.question ?? ""} (${p.jurisdiction ?? ""})`, right: null };
     default:
       return { tag: type.slice(0, 9).toUpperCase(), tagCls: "bg-zinc-400/10 text-zinc-400", text: type.replaceAll("_", " "), right: null };
   }

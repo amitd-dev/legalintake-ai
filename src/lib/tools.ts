@@ -4,6 +4,7 @@ import type { ToolDefinition, ToolHandler } from "./anthropic";
 import { query } from "./db";
 import { logEvent } from "./events";
 import { firmConfig } from "./config";
+import { calendarConfigured, checkAvailability, bookConsultation, humanSlot } from "./calendar";
 
 export const toolDefinitions: ToolDefinition[] = [
   {
@@ -133,14 +134,68 @@ export function makeToolHandlers(ctx: {
       return { ok: true, message: "A staff member has been notified and will reach out shortly." };
     },
 
-    // Phase 3 will wire these to Google Calendar. Honest stubs until then:
-    check_availability: async () => ({
-      ok: false,
-      error: "Online scheduling is being set up. Tell the client a staff member will call to schedule their consultation."
-    }),
-    book_consultation: async () => ({
-      ok: false,
-      error: "Online scheduling is being set up. Tell the client a staff member will call to schedule their consultation."
-    })
+    check_availability: async () => {
+      if (!calendarConfigured()) {
+        return {
+          ok: false,
+          error: "Online scheduling is being set up. Tell the client a staff member will call to schedule their consultation."
+        };
+      }
+      const slots = await checkAvailability(6);
+      if (!slots.length) {
+        return { ok: false, error: "No open slots in the next 7 days. Offer that a staff member will call to schedule." };
+      }
+      return { ok: true, slots, note: "Offer 2-3 of these to the client. Use the exact iso value when booking." };
+    },
+
+    book_consultation: async (input) => {
+      if (!calendarConfigured()) {
+        return {
+          ok: false,
+          error: "Online scheduling is being set up. Tell the client a staff member will call to schedule their consultation."
+        };
+      }
+      const leadId = ctx.getLeadId();
+      if (!leadId) {
+        return { ok: false, error: "No saved lead yet — call save_lead with the client's contact info before booking." };
+      }
+      const slotIso = String(input.slot_iso || "");
+      const attorney = String(input.attorney_name || firmConfig.attorneys[0].name);
+      if (Number.isNaN(Date.parse(slotIso))) {
+        return { ok: false, error: "slot_iso must be a valid ISO timestamp from check_availability." };
+      }
+
+      const leadRows = await query<{ name: string; phone: string | null; email: string | null; case_type: string | null; case_summary: string | null }>(
+        "select name, phone, email, case_type, case_summary from leads where id=$1",
+        [leadId]
+      );
+      const lead = leadRows[0];
+
+      const { eventId, htmlLink } = await bookConsultation({
+        slotIso,
+        attorneyName: attorney,
+        clientName: lead?.name || "Prospective client",
+        contact: [lead?.phone, lead?.email].filter(Boolean).join(" · ") || "on file",
+        caseType: lead?.case_type || "consultation",
+        caseSummary: lead?.case_summary || ""
+      });
+
+      await query(
+        `insert into bookings (lead_id, calendar_event_id, scheduled_at, attorney_name, status)
+         values ($1,$2,$3,$4,'confirmed')`,
+        [leadId, eventId, slotIso, attorney]
+      );
+      await query("update leads set qualification_status='booked' where id=$1", [leadId]);
+      await logEvent("booking_created", {
+        lead_id: leadId,
+        attorney,
+        slot: humanSlot(slotIso),
+        slot_iso: slotIso,
+        calendar_event_id: eventId,
+        event_link: htmlLink
+      });
+
+      return { ok: true, booked: humanSlot(slotIso), attorney, calendar_event_id: eventId };
+    }
   };
 }

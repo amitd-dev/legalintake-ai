@@ -11,7 +11,7 @@ export async function GET() {
     return NextResponse.json({ error: "database not configured" }, { status: 503 });
   }
   try {
-    const [kpis, funnel, events, conversations, hourly] = await Promise.all([
+    const [kpis, funnel, events, conversations, hourly, agents, yesterday] = await Promise.all([
       query<{ leads_today: string; qualified_today: string; booked_today: string; pipeline_value: string }>(`
         select
           count(*) filter (where created_at >= date_trunc('day', now()))                                     as leads_today,
@@ -42,6 +42,34 @@ export async function GET() {
         from generate_series(date_trunc('hour', now()) - interval '11 hours', date_trunc('hour', now()), interval '1 hour') h
         left join leads l on date_trunc('hour', l.created_at) = h
         group by h order by h
+      `),
+      // per-agent proof of work, straight from the event log
+      query<Record<string, string | null>>(`
+        select
+          count(*) filter (where type in ('conversation_started','lead_captured','lead_qualified','lead_unqualified','booking_created','escalation')
+                             and created_at >= date_trunc('day', now()))            as intake_today,
+          count(*) filter (where type in ('conversation_started','lead_captured','lead_qualified','lead_unqualified','booking_created','escalation')) as intake_total,
+          max(created_at) filter (where type in ('conversation_started','lead_captured','lead_qualified','lead_unqualified','booking_created','escalation')) as intake_last,
+          count(*) filter (where type = 'note_recorded' and created_at >= date_trunc('day', now())) as notetaker_today,
+          count(*) filter (where type = 'note_recorded')                            as notetaker_total,
+          max(created_at) filter (where type = 'note_recorded')                     as notetaker_last,
+          count(*) filter (where type = 'document_generated' and created_at >= date_trunc('day', now())) as paralegal_today,
+          count(*) filter (where type = 'document_generated')                       as paralegal_total,
+          max(created_at) filter (where type = 'document_generated')                as paralegal_last
+        from events
+      `),
+      // yesterday's counts for honest day-over-day deltas
+      query<{ leads_y: string; qualified_y: string; booked_y: string }>(`
+        select
+          count(*) filter (where created_at >= date_trunc('day', now()) - interval '1 day'
+                             and created_at < date_trunc('day', now()))             as leads_y,
+          count(*) filter (where qualification_status in ('qualified','booked')
+                             and created_at >= date_trunc('day', now()) - interval '1 day'
+                             and created_at < date_trunc('day', now()))             as qualified_y,
+          count(*) filter (where qualification_status = 'booked'
+                             and created_at >= date_trunc('day', now()) - interval '1 day'
+                             and created_at < date_trunc('day', now()))             as booked_y
+        from leads
       `)
     ]);
 
@@ -51,6 +79,8 @@ export async function GET() {
       events,
       conversations,
       hourly: hourly.map((h) => Number(h.n)),
+      agents: agents[0],
+      yesterday: yesterday[0],
       generated_at: new Date().toISOString()
     });
   } catch (e) {

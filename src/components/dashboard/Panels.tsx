@@ -69,17 +69,86 @@ function Cell({
   );
 }
 
-export function KpiCards({ kpis, hourly }: { kpis: DashboardData["kpis"]; hourly: number[] }) {
+function delta(today: string, yesterday: string): string {
+  const d = Number(today) - Number(yesterday);
+  if (d === 0) return "level vs yesterday";
+  return `${d > 0 ? "+" : ""}${d} vs yesterday`;
+}
+
+export function KpiCards({
+  kpis, hourly, yesterday
+}: { kpis: DashboardData["kpis"]; hourly: number[]; yesterday: DashboardData["yesterday"] }) {
   return (
     <div className={`${PANEL} flex divide-x divide-white/[0.06]`}>
-      <Cell label="Leads today" value={kpis.leads_today} sub="12h trend">
+      <Cell label="Leads today" value={kpis.leads_today} sub={delta(kpis.leads_today, yesterday?.leads_y ?? "0")}>
         <Sparkline series={hourly} />
       </Cell>
-      <Cell label="Qualified" value={kpis.qualified_today} sub="fit + consult-ready" />
-      <Cell label="Booked" value={kpis.booked_today} sub="consultations" />
-      <Cell label="Pipeline value" value={money(kpis.pipeline_value)} sub="qualified estimate" gold />
+      <Cell label="Qualified" value={kpis.qualified_today} sub={delta(kpis.qualified_today, yesterday?.qualified_y ?? "0")} />
+      <Cell label="Booked" value={kpis.booked_today} sub={delta(kpis.booked_today, yesterday?.booked_y ?? "0")} />
+      <Cell label="Pipeline value" value={money(kpis.pipeline_value)} sub="sum of qualified estimates" gold />
     </div>
   );
+}
+
+/* ---------- agent roster: proof of work from the event log ---------- */
+const fmtTime = (iso: string | null | undefined) =>
+  iso
+    ? new Date(iso).toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" })
+    : "—";
+
+export function AgentRoster({ agents }: { agents: Record<string, string | null> }) {
+  const rows = [
+    { name: "Intake Agent", role: "Client intake, qualification & scheduling", k: "intake" },
+    { name: "Note-Taker Agent", role: "Consultation transcripts → case notes", k: "notetaker" },
+    { name: "Paralegal Agent", role: "USCIS form preparation (G-28)", k: "paralegal" }
+  ];
+  return (
+    <div className={PANEL}>
+      <div className={`flex items-baseline justify-between border-b ${HAIR} px-5 py-3.5`}>
+        <p className={LABEL}>AI Staff — activity log</p>
+        <p className="text-[11px] text-zinc-500">verified against event records</p>
+      </div>
+      <table className="w-full text-[12.5px]">
+        <thead>
+          <tr className="text-left text-[10px] uppercase tracking-[0.12em] text-zinc-500">
+            <th className="px-5 py-2 font-medium">Agent</th>
+            <th className="py-2 font-medium">Function</th>
+            <th className="py-2 text-right font-medium">Today</th>
+            <th className="py-2 text-right font-medium">All time</th>
+            <th className="px-5 py-2 text-right font-medium">Last action</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-white/[0.04]">
+          {rows.map((r) => {
+            const today = Number(agents?.[`${r.k}_today`] ?? 0);
+            const total = Number(agents?.[`${r.k}_total`] ?? 0);
+            const last = agents?.[`${r.k}_last`];
+            return (
+              <tr key={r.k}>
+                <td className="px-5 py-3">
+                  <span className="flex items-center gap-2 font-medium text-zinc-200">
+                    <span className={`h-1.5 w-1.5 rounded-full ${total > 0 ? "bg-emerald-400" : "bg-zinc-600"}`} />
+                    {r.name}
+                  </span>
+                </td>
+                <td className="py-3 text-zinc-500">{r.role}</td>
+                <td className="tnum py-3 text-right font-semibold text-zinc-100">{today}</td>
+                <td className="tnum py-3 text-right text-zinc-400">{total}</td>
+                <td className="tnum px-5 py-3 text-right text-zinc-500">{fmtTime(last)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/* agent attribution for each log line */
+function agentFor(type: string): string {
+  if (type === "note_recorded") return "NOTE-TAKER";
+  if (type === "document_generated") return "PARALEGAL";
+  return "INTAKE";
 }
 
 /* ---------- funnel with stage conversion ---------- */
@@ -169,15 +238,19 @@ export function ActivityFeed({ events }: { events: DashboardData["events"] }) {
           {events.map((e) => {
             const m = eventMeta(e.type, e.payload);
             return (
-              <div key={e.id} className="flex items-center gap-3.5 py-3">
+              <div key={e.id} className="flex items-center gap-3 py-3">
                 <span className="tnum w-[52px] flex-shrink-0 text-[11px] text-zinc-500">
                   {new Date(e.created_at).toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" })}
+                </span>
+                <span className="w-[88px] flex-shrink-0 text-[10px] font-semibold tracking-wide text-zinc-500">
+                  {agentFor(e.type)}
                 </span>
                 <span className={`flex-shrink-0 rounded px-1.5 py-0.5 text-[9.5px] font-semibold tracking-wide ${m.tagCls}`}>
                   {m.tag}
                 </span>
                 <p className="min-w-0 flex-1 truncate text-[13px] text-zinc-200">{m.text}</p>
                 {m.right && <span className="tnum flex-shrink-0 text-[12.5px] font-semibold text-[#e3b341]">{m.right}</span>}
+                <span className="tnum hidden flex-shrink-0 text-[10px] text-zinc-600 sm:block">#{e.id.slice(0, 6)}</span>
               </div>
             );
           })}

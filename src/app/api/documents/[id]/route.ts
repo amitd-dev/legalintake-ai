@@ -10,9 +10,10 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     [params.id]
   );
   if (!rows.length) return NextResponse.json({ error: "not found" }, { status: 404 });
+  const isPdf = rows[0].filename.toLowerCase().endsWith(".pdf");
   return new NextResponse(new Uint8Array(rows[0].content), {
     headers: {
-      "content-type": "application/pdf",
+      "content-type": isPdf ? "application/pdf" : "text/plain; charset=utf-8",
       "content-disposition": `inline; filename="${rows[0].filename}"`
     }
   });

@@ -69,6 +69,7 @@ export async function POST(req: NextRequest) {
       [leadId, filename, Buffer.from(filled), JSON.stringify(mapped)]
     );
     await logEvent("document_generated", {
+      agent: "paralegal",
       lead_id: leadId,
       document_id: rows[0].id,
       doc_type: "USCIS Form G-28",

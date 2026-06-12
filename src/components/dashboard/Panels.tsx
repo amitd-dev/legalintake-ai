@@ -100,7 +100,8 @@ export function AgentRoster({ agents }: { agents: Record<string, string | null> 
   const rows = [
     { name: "Intake Agent", role: "Client intake, qualification & scheduling", k: "intake" },
     { name: "Note-Taker Agent", role: "Consultation transcripts → case notes", k: "notetaker" },
-    { name: "Paralegal Agent", role: "USCIS form preparation (G-28)", k: "paralegal" }
+    { name: "Paralegal Agent", role: "USCIS form preparation (G-28)", k: "paralegal" },
+    { name: "Drafting Agent", role: "Demand letters, engagement letters, NDAs", k: "drafting" }
   ];
   return (
     <div className={PANEL}>

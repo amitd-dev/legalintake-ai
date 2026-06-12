@@ -68,6 +68,29 @@ export default function Paralegal() {
     setBusy(null);
   }
 
+  const [docType, setDocType] = useState("demand_letter");
+  async function generateDraft() {
+    if (!matter) return;
+    setBusy("draft");
+    setMsg(null);
+    try {
+      const r = await fetch("/api/agent/drafting", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ leadId: matter.id, docType })
+      });
+      const d = await r.json();
+      if (!r.ok || d.error) setMsg("Drafting agent error: " + (d.error || r.status));
+      else {
+        setMsg("Draft generated — ready for attorney review.");
+        await load();
+      }
+    } catch {
+      setMsg("Network error");
+    }
+    setBusy(null);
+  }
+
   async function generateG28() {
     if (!matter) return;
     setBusy("g28");
@@ -181,6 +204,30 @@ export default function Paralegal() {
                 <button onClick={recordNotes} disabled={busy !== null || !transcript.trim()} className={`${BTN} mt-3`}>
                   {busy === "notes" ? "Structuring notes…" : "Record case notes"}
                 </button>
+              </div>
+
+              {/* drafting agent */}
+              <div className={`${PANEL} p-5`}>
+                <p className={`${LABEL} mb-3`}>Drafting Agent — legal documents</p>
+                <p className="mb-3 text-[12px] text-zinc-500">
+                  Generates a first draft from the intake record and consultation notes. Unknown facts become
+                  [PLACEHOLDER] markers — nothing is invented. Output is marked for attorney review.
+                </p>
+                <div className="flex items-center gap-2.5">
+                  <select
+                    value={docType}
+                    onChange={(e) => setDocType(e.target.value)}
+                    className="rounded-md border border-white/[0.1] bg-[#0a0a0b] px-3 py-2 text-[12.5px] text-zinc-100 outline-none focus:border-sky-400/50"
+                  >
+                    <option value="demand_letter">Demand letter</option>
+                    <option value="engagement_letter">Engagement letter</option>
+                    <option value="nda">Mutual NDA</option>
+                    <option value="follow_up_letter">Client follow-up letter</option>
+                  </select>
+                  <button onClick={generateDraft} disabled={busy !== null} className={BTN}>
+                    {busy === "draft" ? "Drafting…" : "Generate draft"}
+                  </button>
+                </div>
               </div>
 
               {/* paralegal form agent */}

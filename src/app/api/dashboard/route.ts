@@ -53,9 +53,14 @@ export async function GET() {
           count(*) filter (where type = 'note_recorded' and created_at >= date_trunc('day', now())) as notetaker_today,
           count(*) filter (where type = 'note_recorded')                            as notetaker_total,
           max(created_at) filter (where type = 'note_recorded')                     as notetaker_last,
-          count(*) filter (where type = 'document_generated' and created_at >= date_trunc('day', now())) as paralegal_today,
-          count(*) filter (where type = 'document_generated')                       as paralegal_total,
-          max(created_at) filter (where type = 'document_generated')                as paralegal_last
+          count(*) filter (where type = 'document_generated' and coalesce(payload->>'agent','paralegal') = 'paralegal'
+                             and created_at >= date_trunc('day', now()))            as paralegal_today,
+          count(*) filter (where type = 'document_generated' and coalesce(payload->>'agent','paralegal') = 'paralegal') as paralegal_total,
+          max(created_at) filter (where type = 'document_generated' and coalesce(payload->>'agent','paralegal') = 'paralegal') as paralegal_last,
+          count(*) filter (where type = 'document_generated' and payload->>'agent' = 'drafting'
+                             and created_at >= date_trunc('day', now()))            as drafting_today,
+          count(*) filter (where type = 'document_generated' and payload->>'agent' = 'drafting') as drafting_total,
+          max(created_at) filter (where type = 'document_generated' and payload->>'agent' = 'drafting') as drafting_last
         from events
       `),
       // yesterday's counts for honest day-over-day deltas

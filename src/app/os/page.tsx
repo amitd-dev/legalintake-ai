@@ -40,12 +40,15 @@ const TEST_CLIENTS: { source: string; messages: string[] }[] = [
 const AGENT_DEFS = [
   { key: "intake", name: "Intake Agent", proc: "intake.agent", desc: "Client intake · qualification · booking" },
   { key: "notetaker", name: "Note-Taker Agent", proc: "notes.agent", desc: "Consultation transcripts → case notes" },
-  { key: "paralegal", name: "Paralegal Agent", proc: "forms.agent", desc: "USCIS form preparation (G-28)" }
+  { key: "paralegal", name: "Paralegal Agent", proc: "forms.agent", desc: "USCIS form preparation (G-28)" },
+  { key: "drafting", name: "Drafting Agent", proc: "draft.agent", desc: "Demand letters · NDAs · engagement letters" }
 ] as const;
 
-function agentKeyFor(type: string): string {
-  if (type === "note_recorded") return "notetaker";
-  if (type === "document_generated") return "paralegal";
+function agentKeyFor(e: Ev): string {
+  if (e.type === "note_recorded") return "notetaker";
+  if (e.type === "document_generated") {
+    return (e.payload as Record<string, unknown>).agent === "drafting" ? "drafting" : "paralegal";
+  }
   return "intake";
 }
 
@@ -155,7 +158,7 @@ export default function AgentOS() {
     setTimeout(() => setClient((c) => ({ ...c, status: "" })), 5000);
   }
 
-  const byAgent = (k: string) => events.filter((e) => agentKeyFor(e.type) === k);
+  const byAgent = (k: string) => events.filter((e) => agentKeyFor(e) === k);
   const isActive = (k: string) => {
     const last = agents[`${k}_last`];
     return last ? now - new Date(last).getTime() < 2 * 60 * 1000 : false;
@@ -239,7 +242,7 @@ export default function AgentOS() {
         })}
 
         {/* system monitor */}
-        <Window title="system.monitor" className="xl:col-span-1"
+        <Window title="system.monitor" className="lg:col-span-2 xl:col-span-1"
           status={<span className="text-[9px] font-bold tracking-wider text-zinc-500">DB LIVE</span>}>
           <div className="space-y-3 px-3.5 py-3">
             {data ? (
@@ -273,14 +276,14 @@ export default function AgentOS() {
         {/* console: full width */}
         <Window
           title="events.console — /var/log/agents"
-          className="lg:col-span-2 xl:col-span-4"
+          className="lg:col-span-2 xl:col-span-3"
           status={<span className="tnum text-[9px] font-bold tracking-wider text-zinc-500">{events.length} EVENTS</span>}
         >
           <div className="max-h-72 overflow-y-auto bg-black/40 px-3.5 py-2.5 font-mono text-[11px] leading-[1.85]">
             {events.map((e) => (
               <p key={e.id} className={`whitespace-nowrap rounded px-1 -mx-1 ${fresh.has(e.id) ? "ev-new" : ""}`}>
                 <span className="text-zinc-600">{t(e.created_at)}</span>{" "}
-                <span className="text-sky-300/80">[{agentKeyFor(e.type)}]</span>{" "}
+                <span className="text-sky-300/80">[{agentKeyFor(e)}]</span>{" "}
                 <span className={e.type === "escalation" ? "text-red-300" : "text-zinc-300"}>{line(e)}</span>{" "}
                 <span className="text-zinc-700">#{e.id.slice(0, 8)}</span>
               </p>

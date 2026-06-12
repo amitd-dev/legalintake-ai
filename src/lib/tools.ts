@@ -4,7 +4,7 @@ import type { ToolDefinition, ToolHandler } from "./anthropic";
 import { query } from "./db";
 import { logEvent } from "./events";
 import { firmConfig } from "./config";
-import { calendarConfigured, checkAvailability, bookConsultation, humanSlot } from "./calendar";
+import { calendarConfigured, checkAvailability, bookConsultation, humanSlot, internalAvailability } from "./calendar";
 
 export const toolDefinitions: ToolDefinition[] = [
   {
@@ -135,13 +135,8 @@ export function makeToolHandlers(ctx: {
     },
 
     check_availability: async () => {
-      if (!calendarConfigured()) {
-        return {
-          ok: false,
-          error: "Online scheduling is being set up. Tell the client a staff member will call to schedule their consultation."
-        };
-      }
-      const slots = await checkAvailability(6);
+      // Google-backed when credentials exist; internal business-hours scheduler otherwise.
+      const slots = calendarConfigured() ? await checkAvailability(6) : internalAvailability(6);
       if (!slots.length) {
         return { ok: false, error: "No open slots in the next 7 days. Offer that a staff member will call to schedule." };
       }
@@ -149,12 +144,6 @@ export function makeToolHandlers(ctx: {
     },
 
     book_consultation: async (input) => {
-      if (!calendarConfigured()) {
-        return {
-          ok: false,
-          error: "Online scheduling is being set up. Tell the client a staff member will call to schedule their consultation."
-        };
-      }
       const leadId = ctx.getLeadId();
       if (!leadId) {
         return { ok: false, error: "No saved lead yet — call save_lead with the client's contact info before booking." };
@@ -171,14 +160,26 @@ export function makeToolHandlers(ctx: {
       );
       const lead = leadRows[0];
 
-      const { eventId, htmlLink } = await bookConsultation({
-        slotIso,
-        attorneyName: attorney,
-        clientName: lead?.name || "Prospective client",
-        contact: [lead?.phone, lead?.email].filter(Boolean).join(" · ") || "on file",
-        caseType: lead?.case_type || "consultation",
-        caseSummary: lead?.case_summary || ""
-      });
+      let eventId: string;
+      let htmlLink = "";
+      let calendarBackend: "google" | "internal";
+      if (calendarConfigured()) {
+        const res = await bookConsultation({
+          slotIso,
+          attorneyName: attorney,
+          clientName: lead?.name || "Prospective client",
+          contact: [lead?.phone, lead?.email].filter(Boolean).join(" · ") || "on file",
+          caseType: lead?.case_type || "consultation",
+          caseSummary: lead?.case_summary || ""
+        });
+        eventId = res.eventId;
+        htmlLink = res.htmlLink;
+        calendarBackend = "google";
+      } else {
+        // Internal scheduler: booking is a real DB record; no external calendar event.
+        eventId = `internal-${crypto.randomUUID()}`;
+        calendarBackend = "internal";
+      }
 
       await query(
         `insert into bookings (lead_id, calendar_event_id, scheduled_at, attorney_name, status)
@@ -192,6 +193,7 @@ export function makeToolHandlers(ctx: {
         slot: humanSlot(slotIso),
         slot_iso: slotIso,
         calendar_event_id: eventId,
+        calendar_backend: calendarBackend,
         event_link: htmlLink
       });
 

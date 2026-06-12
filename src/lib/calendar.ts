@@ -85,6 +85,31 @@ export async function checkAvailability(limit = 6): Promise<{ iso: string; label
   return slots;
 }
 
+/**
+ * Internal scheduler fallback (no Google credentials configured).
+ * Generates real business-hours slots from the clock — bookings are still real
+ * database records; only the external Google Calendar event is skipped.
+ */
+export function internalAvailability(limit = 6): { iso: string; label: string }[] {
+  const now = new Date();
+  const windowStart = new Date(now.getTime() + 60 * 60 * 1000);
+  const slots: { iso: string; label: string }[] = [];
+  const step = 30 * 60 * 1000;
+  let t = Math.ceil(windowStart.getTime() / step) * step;
+  const windowEnd = now.getTime() + 7 * 24 * 60 * 60 * 1000;
+  for (; t < windowEnd && slots.length < limit; t += step) {
+    const start = new Date(t);
+    const day = dayInTz(start);
+    if (day === 0 || day === 6) continue;
+    const hour = hourInTz(start);
+    if (hour < BUSINESS_START_HOUR || hour >= BUSINESS_END_HOUR) continue;
+    // offer slots on the hour / half hour spaced out across days
+    slots.push({ iso: start.toISOString(), label: humanSlot(start.toISOString()) });
+    t += 90 * 60 * 1000; // spread offered slots out
+  }
+  return slots;
+}
+
 /** Creates a real calendar event. Returns the Google event id and link. */
 export async function bookConsultation(opts: {
   slotIso: string;

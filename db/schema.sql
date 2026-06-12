@@ -54,6 +54,20 @@ create table if not exists events (
   created_at timestamptz not null default now()
 );
 
+-- ============================================================================
+-- FUTURE AGENTS (Phases 7-11) — designed-in, created when each phase begins.
+-- Architecture rule: every agent writes to the shared `events` table above,
+-- so the dashboard stays the single pane of glass. One database, one event
+-- stream, many agents.
+--
+-- Phase 7  Document Drafting:  documents(id, lead_id, type, status draft/reviewed/sent, content, created_at)
+-- Phase 8  Legal Research:     research_memos(id, question, jurisdiction, memo, citations_verified bool, created_at)
+-- Phase 9  Discovery/Review:   doc_batches, doc_files, doc_findings(file_id, page, excerpt_reference,
+--                              issue_tag, relevance_score), chronologies — plus a background job queue
+-- Phase 10 Billing:            time_entries, invoices, payment_reminders (Stripe links)
+-- Phase 11 Deadlines:          deadlines(matter_id, type, due_date, alert_schedule, status) + daily cron
+-- ============================================================================
+
 create index if not exists idx_messages_conversation on messages(conversation_id, created_at);
 create index if not exists idx_events_created on events(created_at desc);
 create index if not exists idx_leads_created on leads(created_at desc);

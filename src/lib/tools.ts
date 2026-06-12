@@ -5,6 +5,7 @@ import { query } from "./db";
 import { logEvent } from "./events";
 import { firmConfig } from "./config";
 import { calendarConfigured, checkAvailability, bookConsultation, humanSlot, internalAvailability } from "./calendar";
+import { sendEscalationEmail } from "./notify";
 
 export const toolDefinitions: ToolDefinition[] = [
   {
@@ -130,6 +131,19 @@ export function makeToolHandlers(ctx: {
         conversation_id: ctx.conversationId,
         lead_id: ctx.getLeadId(),
         reason: input.reason
+      });
+      // notify a human (email if configured; dashboard always)
+      const leadId = ctx.getLeadId();
+      const leadRow = leadId
+        ? (await query<{ name: string | null; phone: string | null; email: string | null }>(
+            "select name, phone, email from leads where id=$1", [leadId]
+          ))[0]
+        : null;
+      void sendEscalationEmail({
+        reason: String(input.reason || ""),
+        leadName: leadRow?.name,
+        contact: [leadRow?.phone, leadRow?.email].filter(Boolean).join(" · "),
+        conversationId: ctx.conversationId
       });
       return { ok: true, message: "A staff member has been notified and will reach out shortly." };
     },

@@ -7,6 +7,7 @@ import { intakeSystemPrompt } from "@/lib/prompts";
 import { dbConfigured, query } from "@/lib/db";
 import { toolDefinitions, makeToolHandlers } from "@/lib/tools";
 import { logEvent } from "@/lib/events";
+import { rateLimit } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -43,6 +44,15 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 export async function POST(req: NextRequest) {
   try {
+    const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+    const rl = rateLimit(ip);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: "You're sending messages a little fast — please wait a moment and try again." },
+        { status: 429 }
+      );
+    }
+
     const body = await req.json().catch(() => null);
     const messages = sanitizeMessages(body?.messages);
     if (!messages.length) {

@@ -1,59 +1,48 @@
 # LegalIntake AI
 
-Real-time AI agent platform for law firms. An intake agent answers prospective-client inquiries 24/7 via web chat, qualifies the case, books a real Google Calendar consultation, and logs everything to Postgres. A live operations dashboard (`/dashboard`) shows leads, conversations, bookings, and pipeline value from real database rows — no simulated data.
+Real-time AI agent platform for law firms. The flagship **Intake Agent** answers prospective-client inquiries 24/7 via web chat, qualifies the case, books a consultation, and logs everything to Postgres. A live **Operations Dashboard** (`/dashboard`) shows leads, conversations, bookings, and pipeline value — every number from the database, nothing simulated.
+
+**Live:** chat at `/`, ops view at `/dashboard`.
 
 ## Stack
 
-Next.js 14 (App Router, TypeScript) · Tailwind · Anthropic Claude (tool calling) · DigitalOcean Managed Postgres · Google Calendar API (service account) · Vercel
+Next.js 14 (App Router, TypeScript) · Tailwind · Anthropic Claude (`claude-sonnet-4-6`, tool calling) · DigitalOcean Managed Postgres · Google Calendar API (service account, optional) · Resend (escalation email, optional) · Vercel
+
+## How it works
+
+The agent runs server-side in `/api/chat` with four tools, each of which writes an `events` row the dashboard picks up within ~2s:
+
+| Tool | Effect |
+| --- | --- |
+| `save_lead` | Insert/update `leads` row, qualification status, estimated value |
+| `check_availability` | Real Google free/busy slots — or internal business-hours scheduler when Google isn't configured |
+| `book_consultation` | Calendar event (Google mode), `bookings` row, lead → `booked` |
+| `escalate` | Flags conversation, logs event, emails a partner via Resend (if configured) |
+
+Guardrails: never gives legal advice; collects contact info before booking; escalates on distress, arrests, court dates, or explicit request for a human. Per-IP rate limiting on the chat API. Tool actions are surfaced to the client as inline chips ("✓ Consultation booked") and to the firm on the dashboard.
 
 ## Setup
 
-### 1. Database (DigitalOcean Managed Postgres)
+1. **Database** — DigitalOcean → Databases → PostgreSQL. Set `DATABASE_URL`, then apply the schema: `npm run db:migrate` (or `POST /api/admin/migrate?token=MIGRATE_TOKEN` once deployed).
+2. **Anthropic** — set `ANTHROPIC_API_KEY`.
+3. **Google Calendar (optional)** — Cloud console → enable Calendar API → service account → JSON key → share the firm calendar with the service-account email ("Make changes to events"). Set `GOOGLE_SERVICE_ACCOUNT_JSON` + `GOOGLE_CALENDAR_ID`. Without these, the internal scheduler is used (bookings are still real DB records).
+4. **Escalation email (optional)** — set `RESEND_API_KEY` + `ESCALATION_EMAIL`.
+5. **Run** — `npm install && npm run dev` → localhost:3000. **Deploy** — push to GitHub, import in Vercel, set env vars (mark secrets Sensitive). Pushes to `main` auto-deploy.
 
-1. DO control panel → Databases → Create → PostgreSQL (smallest plan is fine).
-2. Copy the connection string (Connection Details → Connection string, `sslmode=require`).
-3. Set it as `DATABASE_URL` in `.env.local`, then apply the schema:
-
-```bash
-npm run db:migrate
-```
-
-(Or after deploy: `POST https://your-app/api/admin/migrate?token=MIGRATE_TOKEN` — Phase 2+.)
-
-### 2. Google Calendar (service account)
-
-1. Google Cloud console → create/select a project → enable **Google Calendar API**.
-2. IAM & Admin → Service Accounts → Create service account → Keys → Add key (JSON).
-3. In Google Calendar, share the target calendar with the service account's `client_email`, permission **Make changes to events**.
-4. Set `GOOGLE_SERVICE_ACCOUNT_JSON` (the JSON, single line) and `GOOGLE_CALENDAR_ID` in env.
-
-### 3. Environment variables
-
-Copy `.env.example` → `.env.local` and fill in. On Vercel: Project → Settings → Environment Variables (mark secrets as Sensitive).
-
-### 4. Run locally
-
-```bash
-npm install
-npm run dev   # http://localhost:3000 (chat) · /dashboard (ops)
-```
-
-### 5. Deploy
-
-Push to GitHub → vercel.com → Add New Project → import the repo → set env vars → Deploy. Pushes to `main` auto-deploy.
-
-## Architecture notes
-
-- The Anthropic key is used only inside API routes (server-side). The browser never sees it.
-- Every agent tool call (`save_lead`, `check_availability`, `book_consultation`, `escalate`) writes an `events` row; the dashboard polls a single aggregate endpoint (~2s) so all numbers come from the database.
-- Realtime: DO Postgres has no websocket push layer (unlike Supabase), so the dashboard uses short-interval polling of indexed queries — same real data, serverless-safe.
-- The agent never gives legal advice; distress/urgency/uncertainty triggers the `escalate` tool, which flags the conversation and notifies a human (email in Phase 5).
+All env vars are documented in `.env.example`. Firm name, practice areas, and attorneys are configurable (`FIRM_NAME`, `FIRM_PRACTICE_AREAS`, `FIRM_ATTORNEYS`).
 
 ## Phase status
 
-- [x] Phase 1 — foundation: scaffold, schema, `/api/chat` with intake prompt, chat UI
-- [ ] Phase 2 — tool calling + persistence (leads, conversations, messages, events)
-- [ ] Phase 3 — Google Calendar availability + real bookings
-- [ ] Phase 4 — live ops dashboard
-- [ ] Phase 5 — hardening, rate limiting, escalation email, production deploy
-- [ ] Phase 6 — stubs only: Twilio voice/SMS, Stripe, e-signature
+- [x] Phase 1 — foundation (scaffold, schema, chat agent, chat UI)
+- [x] Phase 2 — tool calling + full persistence (leads, conversations, messages, events)
+- [x] Phase 3 — calendar booking (Google-ready; internal scheduler active by default)
+- [x] Phase 4 — live ops dashboard (~2s polling of indexed aggregates)
+- [x] Phase 5 — rate limiting, escalation email, inline action chips, stubs, docs
+- [ ] Phase 6 — stubs only: `src/lib/stubs/` (Twilio voice/SMS, Stripe, e-signature)
+- [ ] Phases 7–11 — future agents (drafting, research, discovery, billing, deadlines); table designs documented in `db/schema.sql`, all plug into the shared `events` stream
+
+## Notes & deviations
+
+- Database is DO Managed Postgres (owner's choice) instead of Supabase; dashboard realtime is short-interval polling instead of Supabase Realtime — same real data, serverless-safe.
+- The Anthropic key never reaches the client; all AI calls are server-side.
+- Rotate the database password from the DO console if it has ever been shared, and update `DATABASE_URL` in Vercel.

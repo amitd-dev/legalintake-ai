@@ -4,6 +4,7 @@
 import React from "react";
 
 const NAV: { label: string; href: string; icon: string }[] = [
+  { label: "Agent OS", href: "/os", icon: "M3 4h18v12H3zM8 20h8M12 16v4" },
   { label: "Operations", href: "/dashboard", icon: "M3 13h4v8H3zM10 7h4v14h-4zM17 3h4v18h-4z" },
   { label: "Paralegal", href: "/paralegal", icon: "M5 3h10l4 4v14H5zM14 3v5h5" },
   { label: "Client chat", href: "/", icon: "M4 5h16v11H8l-4 4z" }

@@ -29,7 +29,7 @@ export async function GET() {
           (select count(*) from bookings where status in ('confirmed','completed'))             as booked,
           (select count(*) from bookings where status = 'completed')                            as showed
       `),
-      query(`select id, type, payload, created_at from events order by created_at desc limit 25`),
+      query(`select id, type, payload, created_at from events order by created_at desc limit 50`),
       query(`
         select c.id, c.started_at, c.status, c.escalated, l.name as lead_name, l.case_type,
                (select count(*) from messages m where m.conversation_id = c.id) as message_count

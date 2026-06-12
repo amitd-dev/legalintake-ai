@@ -14,7 +14,7 @@ const ACTION_LABELS: Record<string, string> = {
 const GREETING =
   "Hello, and thank you for reaching out. I'm the intake assistant here — I can take down the details of your situation and get you scheduled with one of our attorneys. What brings you in today?";
 
-export default function ChatWindow({ firmName }: { firmName: string }) {
+export default function ChatWindow({ firmName, source = "web" }: { firmName: string; source?: string }) {
   const [messages, setMessages] = useState<Msg[]>([{ role: "assistant", content: GREETING }]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -38,7 +38,7 @@ export default function ChatWindow({ firmName }: { firmName: string }) {
       const r = await fetch("/api/chat", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ messages: next, conversationId })
+        body: JSON.stringify({ messages: next, conversationId, source })
       });
       const data = await r.json();
       if (!r.ok || data.error) {

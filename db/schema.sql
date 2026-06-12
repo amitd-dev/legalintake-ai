@@ -54,8 +54,31 @@ create table if not exists events (
   created_at timestamptz not null default now()
 );
 
+-- AI note-taker: consultation transcripts structured into case notes
+create table if not exists consultation_notes (
+  id uuid primary key default gen_random_uuid(),
+  lead_id uuid not null references leads(id) on delete cascade,
+  transcript text not null,
+  structured jsonb not null default '{}',
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_notes_lead on consultation_notes(lead_id, created_at desc);
+
+-- Paralegal agent output: generated documents (e.g. filled USCIS Form G-28)
+create table if not exists documents (
+  id uuid primary key default gen_random_uuid(),
+  lead_id uuid not null references leads(id) on delete cascade,
+  type text not null,                -- e.g. 'g-28'
+  status text not null default 'draft' check (status in ('draft','reviewed','sent')),
+  filename text not null,
+  content bytea not null,            -- the filled PDF bytes
+  field_data jsonb not null default '{}',
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_documents_lead on documents(lead_id, created_at desc);
+
 -- ============================================================================
--- FUTURE AGENTS (Phases 7-11) — designed-in, created when each phase begins.
+-- FUTURE AGENTS (Phases 8-11) — designed-in, created when each phase begins.
 -- Architecture rule: every agent writes to the shared `events` table above,
 -- so the dashboard stays the single pane of glass. One database, one event
 -- stream, many agents.

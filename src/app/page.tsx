@@ -1,7 +1,10 @@
 import ChatWindow from "@/components/chat/ChatWindow";
 import { firmConfig } from "@/lib/config";
 
-export default function Home() {
+export default function Home({ searchParams }: { searchParams?: { src?: string } }) {
+  const source = ["facebook", "google", "referral", "web"].includes(searchParams?.src || "")
+    ? (searchParams!.src as string)
+    : "web";
   return (
     <main className="mx-auto flex h-dvh max-w-2xl flex-col">
       <header className="flex items-center gap-3.5 border-b border-edge bg-panel px-5 py-4">
@@ -24,7 +27,7 @@ export default function Home() {
         </span>
       </header>
       <div className="min-h-0 flex-1 bg-panel">
-        <ChatWindow firmName={firmConfig.name} />
+        <ChatWindow firmName={firmConfig.name} source={source} />
       </div>
     </main>
   );

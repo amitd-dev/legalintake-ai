@@ -60,6 +60,7 @@ export async function POST(req: NextRequest) {
     }
     const lastUser = messages[messages.length - 1];
     const persist = dbConfigured();
+    const source = ["facebook", "google", "referral", "web"].includes(body?.source) ? body.source : "web";
 
     // --- conversation bookkeeping ---
     let conversationId: string | null =
@@ -84,7 +85,7 @@ export async function POST(req: NextRequest) {
           "insert into conversations (channel, status) values ('web','active') returning id"
         );
         conversationId = rows[0].id;
-        await logEvent("conversation_started", { conversation_id: conversationId, channel: "web" });
+        await logEvent("conversation_started", { conversation_id: conversationId, channel: "web", source });
       }
       await query("insert into messages (conversation_id, role, content) values ($1,'user',$2)", [
         conversationId,
@@ -96,6 +97,7 @@ export async function POST(req: NextRequest) {
     const handlers = persist
       ? makeToolHandlers({
           conversationId: conversationId as string,
+          source,
           getLeadId: () => leadId,
           setLeadId: (id) => { leadId = id; },
           markEscalated: () => { escalated = true; }

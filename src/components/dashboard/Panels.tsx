@@ -142,7 +142,15 @@ function eventMeta(type: string, p: Record<string, unknown>) {
     case "escalation":
       return { tag: "ESCALATED", tagCls: "bg-red-400/10 text-red-300", text: String(p.reason ?? ""), right: null };
     case "conversation_started":
-      return { tag: "SESSION", tagCls: "bg-sky-400/10 text-sky-300", text: `New ${p.channel ?? "web"} conversation`, right: null };
+      return {
+        tag: "SESSION", tagCls: "bg-sky-400/10 text-sky-300",
+        text: `New ${p.channel ?? "web"} conversation${p.source && p.source !== "web" ? ` — via ${p.source}` : ""}`,
+        right: null
+      };
+    case "note_recorded":
+      return { tag: "NOTES", tagCls: "bg-violet-400/10 text-violet-300", text: `Consultation notes — ${p.name ?? "client"}${Array.isArray(p.forms_needed) && p.forms_needed.length ? ` · forms: ${(p.forms_needed as string[]).join(", ")}` : ""}`, right: null };
+    case "document_generated":
+      return { tag: "DOCUMENT", tagCls: "bg-amber-400/10 text-amber-300", text: `${p.doc_type ?? "Document"} drafted — ${p.name ?? "client"}`, right: null };
     default:
       return { tag: type.slice(0, 9).toUpperCase(), tagCls: "bg-zinc-400/10 text-zinc-400", text: type.replaceAll("_", " "), right: null };
   }

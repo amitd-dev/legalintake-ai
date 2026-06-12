@@ -38,6 +38,9 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="flex items-center gap-4">
+            <a href="/paralegal" className="text-[12px] text-zinc-400 hover:text-zinc-200">
+              Paralegal workspace →
+            </a>
             <Clock />
             <span className="flex items-center gap-1.5 rounded-full border border-white/[0.08] px-2.5 py-1 text-[10.5px] font-medium">
               <span className={`h-1.5 w-1.5 rounded-full ${error ? "bg-red-400" : "bg-emerald-400"}`} />

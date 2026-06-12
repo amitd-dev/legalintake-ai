@@ -80,6 +80,7 @@ export const toolDefinitions: ToolDefinition[] = [
  */
 export function makeToolHandlers(ctx: {
   conversationId: string;
+  source?: string;
   getLeadId: () => string | null;
   setLeadId: (id: string) => void;
   markEscalated: () => void;
@@ -103,10 +104,11 @@ export function makeToolHandlers(ctx: {
       } else {
         const rows = await query<{ id: string }>(
           `insert into leads (name, phone, email, case_type, case_summary, urgency, qualification_status, estimated_value, source)
-           values ($1,$2,$3,$4,$5,$6,$7,$8,'web') returning id`,
+           values ($1,$2,$3,$4,$5,$6,$7,$8,$9) returning id`,
           [
             input.name ?? null, input.phone ?? null, input.email ?? null, input.case_type ?? null,
-            input.case_summary ?? null, input.urgency ?? null, status, input.estimated_value ?? null
+            input.case_summary ?? null, input.urgency ?? null, status, input.estimated_value ?? null,
+            ctx.source || "web"
           ]
         );
         leadId = rows[0].id;
@@ -119,7 +121,8 @@ export function makeToolHandlers(ctx: {
         name: input.name,
         case_type: input.case_type,
         urgency: input.urgency,
-        estimated_value: input.estimated_value ?? null
+        estimated_value: input.estimated_value ?? null,
+        source: ctx.source || "web"
       });
       return { ok: true, lead_id: leadId, status };
     },

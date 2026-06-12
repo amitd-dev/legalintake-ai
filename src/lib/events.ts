@@ -8,6 +8,8 @@ export type EventType =
   | "conversation_started"
   | "booking_created"
   | "escalation"
+  | "note_recorded"
+  | "document_generated"
   | "agent_error";
 
 export async function logEvent(type: EventType, payload: Record<string, unknown>): Promise<void> {

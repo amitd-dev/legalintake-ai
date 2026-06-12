@@ -3,6 +3,7 @@
 // Paralegal workspace: pick a matter → record consultation notes (AI note-taker)
 // → generate USCIS Form G-28 (paralegal agent) → download the filled PDF.
 import { useEffect, useState } from "react";
+import Shell from "@/components/Shell";
 
 type Doc = { id: string; type: string; filename: string; status: string; created_at: string };
 type Matter = {
@@ -96,20 +97,17 @@ export default function Paralegal() {
   const note = matter?.latest_note as Record<string, any> | null;
 
   return (
-    <div className="min-h-dvh bg-[#0a0a0b] text-zinc-100">
-      <header className="border-b border-white/[0.06]">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3.5">
-          <div className="flex items-baseline gap-2.5">
-            <span className="text-[13.5px] font-semibold tracking-tight">Hartwell &amp; Vance</span>
-            <span className="text-[13.5px] text-zinc-500">Paralegal Workspace</span>
+    <Shell active="Paralegal">
+      <header className="sticky top-0 z-10 border-b border-white/[0.06] bg-[#0a0a0b]/90 backdrop-blur">
+        <div className="flex items-center justify-between px-6 py-3">
+          <div>
+            <h1 className="text-[14px] font-semibold tracking-tight">Paralegal Workspace</h1>
+            <p className="text-[10.5px] text-zinc-500">Consultation notes & USCIS form preparation</p>
           </div>
-          <a href="/dashboard" className="text-[12px] text-zinc-400 hover:text-zinc-200">
-            ← Operations dashboard
-          </a>
         </div>
       </header>
 
-      <main className="mx-auto grid max-w-6xl grid-cols-1 gap-4 px-6 py-5 lg:grid-cols-[320px_1fr]">
+      <main className="grid grid-cols-1 gap-4 px-6 py-5 lg:grid-cols-[320px_1fr]">
         {/* matters list */}
         <div className={PANEL}>
           <div className={`border-b ${HAIR} px-5 py-3.5`}>
@@ -221,6 +219,6 @@ export default function Paralegal() {
           )}
         </div>
       </main>
-    </div>
+    </Shell>
   );
 }

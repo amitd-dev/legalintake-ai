@@ -3,10 +3,39 @@
 // Agent OS — mission-control view. Each AI agent runs in its own "window" with a
 // live ACTIVE/IDLE status and its own work stream; a system console tails every
 // event. All state polled from the production database every 2 seconds.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useDashboardData, type DashboardData } from "@/components/dashboard/useDashboardData";
 
 type Ev = DashboardData["events"][number];
+
+/* Live test client: a scripted prospect played through the REAL /api/chat —
+   real Claude replies, real tool calls, real database rows. Nothing simulated. */
+const TEST_CLIENTS: { source: string; messages: string[] }[] = [
+  {
+    source: "facebook",
+    messages: [
+      "Hi, I saw your ad on Facebook. My green card interview is coming up and I'm nervous — I want a lawyer with me. I'm Rosa Delgado, rosa.delgado@email.com, 555-0171.",
+      "The interview is in about 6 weeks in Newark. I applied through my husband who is a citizen. Can someone help prepare me?",
+      "Yes, any of those times works — book the earliest one please."
+    ]
+  },
+  {
+    source: "web",
+    messages: [
+      "Hello, I slipped on ice outside a grocery store in January and broke my wrist. Two surgeries so far. I'm James O'Neill, joneill@email.com, 555-0162.",
+      "The store never salted the walkway, there are photos. Medical bills are around $40,000 so far and I missed 2 months of work. What are the next steps?",
+      "Tuesday morning works great — please book it."
+    ]
+  },
+  {
+    source: "web",
+    messages: [
+      "Hi, my business partner and I are splitting up and we disagree about who keeps the client list. I'm Priya Shah, priya@shahconsulting.com, 555-0144.",
+      "We're a two-person consulting LLC, about $900k revenue. No operating agreement unfortunately. I'd like to talk to someone this week.",
+      "Yes, the first available slot works — book it please."
+    ]
+  }
+];
 
 const AGENT_DEFS = [
   { key: "intake", name: "Intake Agent", proc: "intake.agent", desc: "Client intake · qualification · booking" },
@@ -77,6 +106,55 @@ export default function AgentOS() {
   const agents = data?.agents || {};
   const now = Date.now();
 
+  /* flash newly-arrived events */
+  const seen = useRef<Set<string> | null>(null);
+  const [fresh, setFresh] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (!events.length) return;
+    if (seen.current === null) {
+      seen.current = new Set(events.map((e) => e.id)); // first load: nothing flashes
+      return;
+    }
+    const newIds = events.filter((e) => !seen.current!.has(e.id)).map((e) => e.id);
+    if (newIds.length) {
+      newIds.forEach((id) => seen.current!.add(id));
+      setFresh((f) => new Set([...Array.from(f), ...newIds]));
+      const t = setTimeout(() => setFresh(new Set()), 2000);
+      return () => clearTimeout(t);
+    }
+  }, [events]);
+
+  /* live test client (real agent execution) */
+  const [client, setClient] = useState<{ running: boolean; status: string }>({ running: false, status: "" });
+  async function runTestClient() {
+    if (client.running) return;
+    const script = TEST_CLIENTS[Math.floor(Math.random() * TEST_CLIENTS.length)];
+    setClient({ running: true, status: "test client connecting…" });
+    const history: { role: string; content: string }[] = [];
+    let conversationId: string | null = null;
+    try {
+      for (const msg of script.messages) {
+        setClient({ running: true, status: "test client typing…" });
+        await new Promise((r) => setTimeout(r, 1200));
+        history.push({ role: "user", content: msg });
+        setClient({ running: true, status: "agent working…" });
+        const r: Response = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ messages: history, conversationId, source: script.source })
+        });
+        const d: { error?: string; reply?: string; conversationId?: string } = await r.json();
+        if (!r.ok || d.error) break;
+        if (d.conversationId) conversationId = d.conversationId;
+        history.push({ role: "assistant", content: d.reply || "" });
+      }
+      setClient({ running: false, status: "test client session ended" });
+    } catch {
+      setClient({ running: false, status: "test client disconnected" });
+    }
+    setTimeout(() => setClient((c) => ({ ...c, status: "" })), 5000);
+  }
+
   const byAgent = (k: string) => events.filter((e) => agentKeyFor(e.type) === k);
   const isActive = (k: string) => {
     const last = agents[`${k}_last`];
@@ -98,6 +176,17 @@ export default function AgentOS() {
         <a href="/paralegal" className="text-[11.5px] text-zinc-500 hover:text-zinc-200">Paralegal</a>
         <a href="/" className="text-[11.5px] text-zinc-500 hover:text-zinc-200">Client chat</a>
         <span className="ml-auto flex items-center gap-3">
+          {client.status && (
+            <span className="font-mono text-[10.5px] text-amber-300/90">{client.status}</span>
+          )}
+          <button
+            onClick={runTestClient}
+            disabled={client.running}
+            className="rounded border border-emerald-400/30 bg-emerald-400/10 px-2.5 py-1 text-[10.5px] font-semibold text-emerald-300 hover:bg-emerald-400/20 disabled:opacity-40"
+            title="Plays a scripted prospect through the real chat API — real agent replies, real database records"
+          >
+            ▶ Live test client
+          </button>
           <span className="flex items-center gap-1.5 text-[10.5px] font-medium text-zinc-400">
             <span className={`h-1.5 w-1.5 rounded-full ${error ? "bg-red-400" : "bg-emerald-400"}`} />
             {error ? "RECONNECTING" : "LIVE"}
@@ -133,7 +222,7 @@ export default function AgentOS() {
               <div className="px-3.5 py-2 font-mono text-[10.5px] leading-[1.8] text-zinc-400">
                 {feed.length === 0 && <p className="text-zinc-600">— no activity in current window —</p>}
                 {feed.map((e) => (
-                  <p key={e.id} className="truncate">
+                  <p key={e.id} className={`truncate rounded px-1 -mx-1 ${fresh.has(e.id) ? "ev-new" : ""}`}>
                     <span className="text-zinc-600">{t(e.created_at)}</span>{" "}
                     <span className={e.type === "escalation" ? "text-red-300" : e.type.includes("qualified") || e.type === "booking_created" || e.type === "document_generated" ? "text-emerald-300/90" : "text-zinc-400"}>
                       {line(e)}
@@ -189,7 +278,7 @@ export default function AgentOS() {
         >
           <div className="max-h-72 overflow-y-auto bg-black/40 px-3.5 py-2.5 font-mono text-[11px] leading-[1.85]">
             {events.map((e) => (
-              <p key={e.id} className="whitespace-nowrap">
+              <p key={e.id} className={`whitespace-nowrap rounded px-1 -mx-1 ${fresh.has(e.id) ? "ev-new" : ""}`}>
                 <span className="text-zinc-600">{t(e.created_at)}</span>{" "}
                 <span className="text-sky-300/80">[{agentKeyFor(e.type)}]</span>{" "}
                 <span className={e.type === "escalation" ? "text-red-300" : "text-zinc-300"}>{line(e)}</span>{" "}

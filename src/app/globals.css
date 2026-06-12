@@ -14,3 +14,12 @@ body {
 .tnum {
   font-variant-numeric: tabular-nums;
 }
+
+/* newly-arrived event rows flash briefly */
+@keyframes evflash {
+  0% { background-color: rgba(52, 211, 153, 0.18); }
+  100% { background-color: transparent; }
+}
+.ev-new {
+  animation: evflash 1.8s ease-out;
+}

@@ -43,13 +43,19 @@ const AGENT_DEFS = [
   { key: "paralegal", name: "Paralegal Agent", proc: "forms.agent", desc: "USCIS form preparation (G-28)" },
   { key: "drafting", name: "Drafting Agent", proc: "draft.agent", desc: "Demand letters · NDAs · engagement letters" },
   { key: "research", name: "Research Agent", proc: "research.agent", desc: "Legal memos · citation checklists" },
-  { key: "marketing", name: "Marketing Agent", proc: "market.agent", desc: "Campaign copy · source conversion analysis" }
+  { key: "marketing", name: "Marketing Agent", proc: "market.agent", desc: "Campaign copy · source conversion analysis" },
+  { key: "billing", name: "Billing Agent", proc: "billing.agent", desc: "Time entries · invoice compilation" },
+  { key: "deadline", name: "Deadline Agent", proc: "deadline.agent", desc: "SOL clocks · escalating alerts" },
+  { key: "discovery", name: "Discovery Agent", proc: "discovery.agent", desc: "Document review · findings · chronology" }
 ] as const;
 
 function agentKeyFor(e: Ev): string {
   if (e.type === "note_recorded") return "notetaker";
   if (e.type === "research_memo") return "research";
   if (e.type === "campaign_created") return "marketing";
+  if (e.type === "invoice_drafted") return "billing";
+  if (e.type === "deadline_tracked") return "deadline";
+  if (e.type === "discovery_reviewed") return "discovery";
   if (e.type === "document_generated") {
     return (e.payload as Record<string, unknown>).agent === "drafting" ? "drafting" : "paralegal";
   }
@@ -69,6 +75,9 @@ function line(e: Ev): string {
     case "document_generated": return `${p.doc_type || "document"} drafted — ${p.name || "client"}`;
     case "research_memo": return `memo filed — "${String(p.question || "").slice(0, 50)}" · ${p.jurisdiction || ""} · ${p.authorities ?? 0} authorities`;
     case "campaign_created": return `campaign drafted — ${p.name || "untitled"}${Array.isArray(p.channels) && p.channels.length ? ` · ${p.channels.join(", ")}` : ""} · ${p.ads ?? 0} ads`;
+    case "invoice_drafted": return `invoice drafted — ${p.name || "client"} · $${Number(p.total || 0).toLocaleString()} · ${p.entries ?? 0} entries`;
+    case "deadline_tracked": return p.escalation ? `DEADLINE ${String(p.alert_level || "").toUpperCase()} — ${p.type || ""} · ${p.days_remaining}d` : `deadlines computed — ${p.matter || ""} · ${p.count ?? 0} tracked${p.soonest != null ? ` · soonest ${p.soonest}d` : ""}`;
+    case "discovery_reviewed": return `review complete — ${p.name || "batch"} · ${p.docs ?? 0} docs · ${p.findings ?? 0} findings`;
     default: return e.type.replaceAll("_", " ");
   }
 }
@@ -233,7 +242,7 @@ export default function AgentOS() {
                 {feed.map((e) => (
                   <p key={e.id} className={`truncate rounded px-1 -mx-1 ${fresh.has(e.id) ? "ev-new" : ""}`}>
                     <span className="text-zinc-600">{t(e.created_at)}</span>{" "}
-                    <span className={e.type === "escalation" ? "text-red-300" : e.type.includes("qualified") || e.type === "booking_created" || e.type === "document_generated" || e.type === "research_memo" || e.type === "campaign_created" ? "text-emerald-300/90" : "text-zinc-400"}>
+                    <span className={e.type === "escalation" || (e.type === "deadline_tracked" && (e.payload as Record<string, unknown>).escalation) ? "text-red-300" : e.type.includes("qualified") || e.type === "booking_created" || e.type === "document_generated" || e.type === "research_memo" || e.type === "campaign_created" || e.type === "invoice_drafted" || e.type === "discovery_reviewed" ? "text-emerald-300/90" : "text-zinc-400"}>
                       {line(e)}
                     </span>
                   </p>
@@ -267,8 +276,8 @@ export default function AgentOS() {
                   ))}
                 </div>
                 <div className="font-mono text-[10px] leading-[1.9] text-zinc-500">
-                  <p>processes&nbsp;&nbsp;&nbsp;6 agents · 0 faults</p>
-                  <p>database&nbsp;&nbsp;&nbsp;&nbsp;postgres · 9 tables</p>
+                  <p>processes&nbsp;&nbsp;&nbsp;9 agents · 0 faults</p>
+                  <p>database&nbsp;&nbsp;&nbsp;&nbsp;postgres · 13 tables</p>
                   <p>poll rate&nbsp;&nbsp;&nbsp;2.0s</p>
                   <p>last sync&nbsp;&nbsp;&nbsp;{data.generated_at ? t(data.generated_at) : "—"}</p>
                 </div>

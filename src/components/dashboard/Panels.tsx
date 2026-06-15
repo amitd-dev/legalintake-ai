@@ -103,7 +103,10 @@ export function AgentRoster({ agents }: { agents: Record<string, string | null> 
     { name: "Paralegal Agent", role: "USCIS form preparation (G-28)", k: "paralegal" },
     { name: "Drafting Agent", role: "Demand letters, engagement letters, NDAs", k: "drafting" },
     { name: "Research Agent", role: "Legal research memos + citation checklist", k: "research" },
-    { name: "Marketing Agent", role: "Campaign drafting + source conversion analysis", k: "marketing" }
+    { name: "Marketing Agent", role: "Campaign drafting + source conversion analysis", k: "marketing" },
+    { name: "Billing Agent", role: "Time entries + invoice compilation", k: "billing" },
+    { name: "Deadline Agent", role: "SOL + procedural deadline tracking", k: "deadline" },
+    { name: "Discovery Agent", role: "Document review, findings + chronology", k: "discovery" }
   ];
   return (
     <div className={PANEL}>
@@ -153,6 +156,9 @@ function agentFor(type: string): string {
   if (type === "document_generated") return "DOCS";
   if (type === "research_memo") return "RESEARCH";
   if (type === "campaign_created") return "MARKETING";
+  if (type === "invoice_drafted") return "BILLING";
+  if (type === "deadline_tracked") return "DEADLINE";
+  if (type === "discovery_reviewed") return "DISCOVERY";
   return "INTAKE";
 }
 
@@ -229,6 +235,14 @@ function eventMeta(type: string, p: Record<string, unknown>) {
       return { tag: "RESEARCH", tagCls: "bg-violet-400/10 text-violet-300", text: `Memo — ${p.question ?? ""} (${p.jurisdiction ?? ""})`, right: null };
     case "campaign_created":
       return { tag: "CAMPAIGN", tagCls: "bg-pink-400/10 text-pink-300", text: `Campaign drafted — ${p.name ?? "untitled"}${Array.isArray(p.channels) && p.channels.length ? ` · ${(p.channels as string[]).join(", ")}` : ""}`, right: null };
+    case "invoice_drafted":
+      return { tag: "INVOICE", tagCls: "bg-[#e3b341]/10 text-[#e3b341]", text: `Invoice drafted — ${p.name ?? "client"} · ${p.entries ?? 0} entries`, right: p.total ? money(p.total as number) : null };
+    case "deadline_tracked":
+      return p.escalation
+        ? { tag: "DEADLINE", tagCls: "bg-red-400/10 text-red-300", text: `${String(p.alert_level ?? "").toUpperCase()} — ${p.type ?? "deadline"} · ${p.days_remaining}d`, right: null }
+        : { tag: "DEADLINE", tagCls: "bg-orange-400/10 text-orange-300", text: `Deadlines computed — ${p.matter ?? ""} · ${p.count ?? 0} tracked`, right: null };
+    case "discovery_reviewed":
+      return { tag: "DISCOVERY", tagCls: "bg-sky-400/10 text-sky-300", text: `Review — ${p.name ?? "batch"} · ${p.docs ?? 0} docs · ${p.findings ?? 0} findings`, right: null };
     default:
       return { tag: type.slice(0, 9).toUpperCase(), tagCls: "bg-zinc-400/10 text-zinc-400", text: type.replaceAll("_", " "), right: null };
   }

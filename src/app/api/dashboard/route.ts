@@ -66,7 +66,16 @@ export async function GET() {
           max(created_at) filter (where type = 'research_memo')                     as research_last,
           count(*) filter (where type = 'campaign_created' and created_at >= date_trunc('day', now())) as marketing_today,
           count(*) filter (where type = 'campaign_created')                         as marketing_total,
-          max(created_at) filter (where type = 'campaign_created')                  as marketing_last
+          max(created_at) filter (where type = 'campaign_created')                  as marketing_last,
+          count(*) filter (where type = 'invoice_drafted' and created_at >= date_trunc('day', now())) as billing_today,
+          count(*) filter (where type = 'invoice_drafted')                          as billing_total,
+          max(created_at) filter (where type = 'invoice_drafted')                   as billing_last,
+          count(*) filter (where type = 'deadline_tracked' and created_at >= date_trunc('day', now())) as deadline_today,
+          count(*) filter (where type = 'deadline_tracked')                         as deadline_total,
+          max(created_at) filter (where type = 'deadline_tracked')                  as deadline_last,
+          count(*) filter (where type = 'discovery_reviewed' and created_at >= date_trunc('day', now())) as discovery_today,
+          count(*) filter (where type = 'discovery_reviewed')                       as discovery_total,
+          max(created_at) filter (where type = 'discovery_reviewed')                as discovery_last
         from events
       `),
       // yesterday's counts for honest day-over-day deltas

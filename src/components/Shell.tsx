@@ -9,6 +9,9 @@ const NAV: { label: string; href: string; icon: string }[] = [
   { label: "Paralegal", href: "/paralegal", icon: "M5 3h10l4 4v14H5zM14 3v5h5" },
   { label: "Research", href: "/research", icon: "M10 4a6 6 0 1 0 0 12 6 6 0 0 0 0-12zM15 15l5 5" },
   { label: "Marketing", href: "/marketing", icon: "M3 11l18-7-7 18-2.5-7.5L3 11z" },
+  { label: "Billing", href: "/billing", icon: "M4 4h16v16H4zM8 9h8M8 13h8M8 17h5" },
+  { label: "Deadlines", href: "/deadlines", icon: "M12 8v4l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" },
+  { label: "Discovery", href: "/discovery", icon: "M5 3h10l4 4v14H5zM14 3v5h5M9 13h6M9 16h6" },
   { label: "Client chat", href: "/", icon: "M4 5h16v11H8l-4 4z" }
 ];
 
@@ -19,9 +22,9 @@ const AGENTS: { label: string; desc: string; href?: string; live: boolean }[] = 
   { label: "Drafting Agent", desc: "Letters & contracts", href: "/paralegal", live: true },
   { label: "Research Agent", desc: "Legal research memos", href: "/research", live: true },
   { label: "Marketing Agent", desc: "Campaigns & lead gen", href: "/marketing", live: true },
-  { label: "Discovery Agent", desc: "Document review", live: false },
-  { label: "Billing Agent", desc: "Time entries & invoices", live: false },
-  { label: "Deadline Agent", desc: "Court dates & SOL alerts", live: false }
+  { label: "Billing Agent", desc: "Time entries & invoices", href: "/billing", live: true },
+  { label: "Deadline Agent", desc: "Court dates & SOL alerts", href: "/deadlines", live: true },
+  { label: "Discovery Agent", desc: "Document review", href: "/discovery", live: true }
 ];
 
 export default function Shell({ active, children }: { active: string; children: React.ReactNode }) {

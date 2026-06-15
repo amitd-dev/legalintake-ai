@@ -102,6 +102,66 @@ create table if not exists campaigns (
 );
 create index if not exists idx_campaigns_created on campaigns(created_at desc);
 
+-- Billing Agent: itemized time entries drafted from matter activity, compiled
+-- into invoices. Stripe payment links are stubbed (lib/stubs/stripe).
+create table if not exists time_entries (
+  id uuid primary key default gen_random_uuid(),
+  lead_id uuid references leads(id) on delete set null,
+  invoice_id uuid,
+  entry_date date not null default current_date,
+  narrative text not null,
+  hours numeric(6,2) not null default 0,
+  rate numeric(10,2) not null default 0,
+  amount numeric(12,2) not null default 0,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_time_entries_lead on time_entries(lead_id, created_at desc);
+
+create table if not exists invoices (
+  id uuid primary key default gen_random_uuid(),
+  lead_id uuid references leads(id) on delete set null,
+  invoice_number text not null,
+  client_name text not null default '',
+  matter text not null default '',
+  line_items jsonb not null default '[]',
+  subtotal numeric(12,2) not null default 0,
+  total numeric(12,2) not null default 0,
+  status text not null default 'draft' check (status in ('draft','sent','paid')),
+  payment_link text,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_invoices_created on invoices(created_at desc);
+
+-- Deadline Agent: statute-of-limitations + procedural deadlines with escalating
+-- alert levels. A daily Vercel cron (/api/cron/deadlines) re-evaluates alerts.
+create table if not exists deadlines (
+  id uuid primary key default gen_random_uuid(),
+  lead_id uuid references leads(id) on delete set null,
+  matter text not null default '',
+  type text not null,                 -- e.g. 'statute of limitations', 'answer due'
+  jurisdiction text not null default '',
+  due_date date not null,
+  basis text not null default '',     -- the rule/citation the date is computed from
+  alert_level text not null default 'normal'
+    check (alert_level in ('normal','upcoming','urgent','overdue')),
+  status text not null default 'open' check (status in ('open','resolved','dismissed')),
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_deadlines_due on deadlines(due_date);
+create index if not exists idx_deadlines_status on deadlines(status);
+
+-- Discovery Agent: document-review batches. result jsonb holds findings
+-- (excerpt, issue_tag, relevance), a chronology, and a summary.
+create table if not exists discovery_reviews (
+  id uuid primary key default gen_random_uuid(),
+  lead_id uuid references leads(id) on delete set null,
+  name text not null,
+  doc_count integer not null default 0,
+  result jsonb not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_discovery_created on discovery_reviews(created_at desc);
+
 -- ============================================================================
 -- FUTURE AGENTS (Phases 9-11) — designed-in, created when each phase begins.
 -- Architecture rule: every agent writes to the shared `events` table above,

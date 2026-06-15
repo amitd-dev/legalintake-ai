@@ -65,7 +65,8 @@ export async function POST(req: NextRequest) {
 
     const saved = [];
     for (const d of list) {
-      if (!d.due_date) continue;
+      // Skip anything without a concrete, parseable date (e.g. a leftover "YYYY-MM-DD" template).
+      if (!d.due_date || !/^\d{4}-\d{2}-\d{2}$/.test(d.due_date) || isNaN(new Date(d.due_date).getTime())) continue;
       const level = alertLevelFor(d.due_date);
       const rows = await query<{ id: string }>(
         `insert into deadlines (lead_id, matter, type, jurisdiction, due_date, basis, alert_level, status)

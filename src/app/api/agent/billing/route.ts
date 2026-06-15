@@ -78,7 +78,16 @@ export async function POST(req: NextRequest) {
     const match = reply.match(/\{[\s\S]*\}/);
     if (!match) throw new Error("billing agent returned no JSON");
     const inv = JSON.parse(match[0]);
-    const items: LineItem[] = Array.isArray(inv.line_items) ? inv.line_items : [];
+    const today = new Date().toISOString().slice(0, 10);
+    const safeDate = (d: unknown): string => (typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : today);
+    const rawItems: LineItem[] = Array.isArray(inv.line_items) ? inv.line_items : [];
+    const items: LineItem[] = rawItems.map((it) => ({
+      entry_date: safeDate(it.entry_date),
+      narrative: String(it.narrative || ""),
+      hours: Number(it.hours) || 0,
+      rate: Number(it.rate) || rate,
+      amount: Number(it.amount) || (Number(it.hours) || 0) * (Number(it.rate) || rate)
+    }));
     const subtotal = items.reduce((s, i) => s + (Number(i.amount) || 0), 0);
     const invoiceNumber = `INV-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
 

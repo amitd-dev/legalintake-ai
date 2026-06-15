@@ -8,6 +8,7 @@ const NAV: { label: string; href: string; icon: string }[] = [
   { label: "Operations", href: "/dashboard", icon: "M3 13h4v8H3zM10 7h4v14h-4zM17 3h4v18h-4z" },
   { label: "Paralegal", href: "/paralegal", icon: "M5 3h10l4 4v14H5zM14 3v5h5" },
   { label: "Research", href: "/research", icon: "M10 4a6 6 0 1 0 0 12 6 6 0 0 0 0-12zM15 15l5 5" },
+  { label: "Marketing", href: "/marketing", icon: "M3 11l18-7-7 18-2.5-7.5L3 11z" },
   { label: "Client chat", href: "/", icon: "M4 5h16v11H8l-4 4z" }
 ];
 
@@ -17,7 +18,7 @@ const AGENTS: { label: string; desc: string; href?: string; live: boolean }[] = 
   { label: "Paralegal Agent", desc: "USCIS forms (G-28)", href: "/paralegal", live: true },
   { label: "Drafting Agent", desc: "Letters & contracts", href: "/paralegal", live: true },
   { label: "Research Agent", desc: "Legal research memos", href: "/research", live: true },
-  { label: "Marketing Agent", desc: "Campaigns & lead gen", live: false },
+  { label: "Marketing Agent", desc: "Campaigns & lead gen", href: "/marketing", live: true },
   { label: "Discovery Agent", desc: "Document review", live: false },
   { label: "Billing Agent", desc: "Time entries & invoices", live: false },
   { label: "Deadline Agent", desc: "Court dates & SOL alerts", live: false }

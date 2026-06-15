@@ -88,6 +88,20 @@ create table if not exists research_memos (
 );
 create index if not exists idx_memos_created on research_memos(created_at desc);
 
+-- Marketing Agent: AI-drafted campaign concepts + ad copy, grounded in real
+-- lead-source conversion data. content jsonb holds the structured campaign
+-- (objective, channel_plan, ads[], kpis, disclaimer).
+create table if not exists campaigns (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  goal text not null,
+  channel text not null default 'auto',
+  audience text not null default '',
+  content jsonb not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_campaigns_created on campaigns(created_at desc);
+
 -- ============================================================================
 -- FUTURE AGENTS (Phases 9-11) — designed-in, created when each phase begins.
 -- Architecture rule: every agent writes to the shared `events` table above,

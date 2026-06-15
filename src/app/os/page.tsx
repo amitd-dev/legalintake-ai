@@ -42,12 +42,14 @@ const AGENT_DEFS = [
   { key: "notetaker", name: "Note-Taker Agent", proc: "notes.agent", desc: "Consultation transcripts → case notes" },
   { key: "paralegal", name: "Paralegal Agent", proc: "forms.agent", desc: "USCIS form preparation (G-28)" },
   { key: "drafting", name: "Drafting Agent", proc: "draft.agent", desc: "Demand letters · NDAs · engagement letters" },
-  { key: "research", name: "Research Agent", proc: "research.agent", desc: "Legal memos · citation checklists" }
+  { key: "research", name: "Research Agent", proc: "research.agent", desc: "Legal memos · citation checklists" },
+  { key: "marketing", name: "Marketing Agent", proc: "market.agent", desc: "Campaign copy · source conversion analysis" }
 ] as const;
 
 function agentKeyFor(e: Ev): string {
   if (e.type === "note_recorded") return "notetaker";
   if (e.type === "research_memo") return "research";
+  if (e.type === "campaign_created") return "marketing";
   if (e.type === "document_generated") {
     return (e.payload as Record<string, unknown>).agent === "drafting" ? "drafting" : "paralegal";
   }
@@ -66,6 +68,7 @@ function line(e: Ev): string {
     case "note_recorded": return `case notes filed — ${p.name || "client"}${Array.isArray(p.forms_needed) && p.forms_needed.length ? ` · needs ${p.forms_needed.join(", ")}` : ""}`;
     case "document_generated": return `${p.doc_type || "document"} drafted — ${p.name || "client"}`;
     case "research_memo": return `memo filed — "${String(p.question || "").slice(0, 50)}" · ${p.jurisdiction || ""} · ${p.authorities ?? 0} authorities`;
+    case "campaign_created": return `campaign drafted — ${p.name || "untitled"}${Array.isArray(p.channels) && p.channels.length ? ` · ${p.channels.join(", ")}` : ""} · ${p.ads ?? 0} ads`;
     default: return e.type.replaceAll("_", " ");
   }
 }
@@ -230,7 +233,7 @@ export default function AgentOS() {
                 {feed.map((e) => (
                   <p key={e.id} className={`truncate rounded px-1 -mx-1 ${fresh.has(e.id) ? "ev-new" : ""}`}>
                     <span className="text-zinc-600">{t(e.created_at)}</span>{" "}
-                    <span className={e.type === "escalation" ? "text-red-300" : e.type.includes("qualified") || e.type === "booking_created" || e.type === "document_generated" || e.type === "research_memo" ? "text-emerald-300/90" : "text-zinc-400"}>
+                    <span className={e.type === "escalation" ? "text-red-300" : e.type.includes("qualified") || e.type === "booking_created" || e.type === "document_generated" || e.type === "research_memo" || e.type === "campaign_created" ? "text-emerald-300/90" : "text-zinc-400"}>
                       {line(e)}
                     </span>
                   </p>
@@ -264,8 +267,8 @@ export default function AgentOS() {
                   ))}
                 </div>
                 <div className="font-mono text-[10px] leading-[1.9] text-zinc-500">
-                  <p>processes&nbsp;&nbsp;&nbsp;3 agents · 0 faults</p>
-                  <p>database&nbsp;&nbsp;&nbsp;&nbsp;postgres · 7 tables</p>
+                  <p>processes&nbsp;&nbsp;&nbsp;6 agents · 0 faults</p>
+                  <p>database&nbsp;&nbsp;&nbsp;&nbsp;postgres · 9 tables</p>
                   <p>poll rate&nbsp;&nbsp;&nbsp;2.0s</p>
                   <p>last sync&nbsp;&nbsp;&nbsp;{data.generated_at ? t(data.generated_at) : "—"}</p>
                 </div>

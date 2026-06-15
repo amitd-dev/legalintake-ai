@@ -11,6 +11,7 @@ export type EventType =
   | "note_recorded"
   | "document_generated"
   | "research_memo"
+  | "campaign_created"
   | "agent_error";
 
 export async function logEvent(type: EventType, payload: Record<string, unknown>): Promise<void> {

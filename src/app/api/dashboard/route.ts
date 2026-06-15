@@ -11,7 +11,7 @@ export async function GET() {
     return NextResponse.json({ error: "database not configured" }, { status: 503 });
   }
   try {
-    const [kpis, funnel, events, conversations, hourly, agents, yesterday] = await Promise.all([
+    const [kpis, funnel, events, conversations, hourly, agents, yesterday, system] = await Promise.all([
       query<{ leads_today: string; qualified_today: string; booked_today: string; pipeline_value: string }>(`
         select
           count(*) filter (where created_at >= date_trunc('day', now()))                                     as leads_today,
@@ -90,6 +90,13 @@ export async function GET() {
                              and created_at >= date_trunc('day', now()) - interval '1 day'
                              and created_at < date_trunc('day', now()))             as booked_y
         from leads
+      `),
+      // live system stats: real table count + today's agent faults
+      query<{ tables: string; faults: string }>(`
+        select
+          (select count(*) from information_schema.tables where table_schema = 'public')                 as tables,
+          (select count(*) from events where type = 'agent_error'
+                              and created_at >= date_trunc('day', now()))                                 as faults
       `)
     ]);
 
@@ -101,6 +108,7 @@ export async function GET() {
       hourly: hourly.map((h) => Number(h.n)),
       agents: agents[0],
       yesterday: yesterday[0],
+      system: system[0],
       generated_at: new Date().toISOString()
     });
   } catch (e) {

@@ -18,6 +18,7 @@ export type DashboardData = {
   hourly: number[];
   agents: Record<string, string | null>;
   yesterday: { leads_y: string; qualified_y: string; booked_y: string };
+  system: { tables: string; faults: string };
   generated_at: string;
 };
 

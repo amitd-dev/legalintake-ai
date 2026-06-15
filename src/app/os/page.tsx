@@ -276,8 +276,8 @@ export default function AgentOS() {
                   ))}
                 </div>
                 <div className="font-mono text-[10px] leading-[1.9] text-zinc-500">
-                  <p>processes&nbsp;&nbsp;&nbsp;9 agents · 0 faults</p>
-                  <p>database&nbsp;&nbsp;&nbsp;&nbsp;postgres · 13 tables</p>
+                  <p>processes&nbsp;&nbsp;&nbsp;{AGENT_DEFS.length} agents · {data.system?.faults ?? 0} faults</p>
+                  <p>database&nbsp;&nbsp;&nbsp;&nbsp;postgres · {data.system?.tables ?? "—"} tables</p>
                   <p>poll rate&nbsp;&nbsp;&nbsp;2.0s</p>
                   <p>last sync&nbsp;&nbsp;&nbsp;{data.generated_at ? t(data.generated_at) : "—"}</p>
                 </div>

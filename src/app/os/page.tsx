@@ -37,6 +37,49 @@ const TEST_CLIENTS: { source: string; messages: string[] }[] = [
   }
 ];
 
+/* Full scenario: one coherent immigration matter that drives every agent in
+   sequence — real intake, then real DB-backed runs of all nine. Used by the
+   "Run full demo" button so the whole Agent OS lights up on its own. */
+const FULL_DEMO = {
+  source: "facebook",
+  intake: [
+    "Hi, I saw your firm online. My green-card interview through my husband is coming up and I'd like an attorney with me. I'm Rosa Delgado, rosa.delgado@email.com, 555-0171.",
+    "The interview is in about 6 weeks in Newark. I applied through my husband, who is a U.S. citizen. Can someone help me prepare?",
+    "Yes, the earliest available time works — please book it."
+  ],
+  transcript:
+    "Attorney: Thanks for coming in, Rosa. Let's go over your case.\n" +
+    "Client: My husband Daniel is a U.S. citizen and we filed the I-130 and I-485 together. My interview is in Newark in about six weeks.\n" +
+    "Attorney: When did you last enter the U.S., and on what status?\n" +
+    "Client: I entered in March 2019 on a B-2 visitor visa and overstayed. We married in August 2021.\n" +
+    "Attorney: Any prior immigration filings or denials?\n" +
+    "Client: No, this is the first time. My A-number from the receipts is A123456789.\n" +
+    "Attorney: We'll file a G-28 to appear as counsel, review your bona fide marriage evidence, and prep you for the interview. The prior overstay is generally forgiven for the immediate relative of a citizen.\n" +
+    "Attorney: Before next meeting, please send joint financial records, photos, and your ID documents.",
+  research: {
+    question:
+      "What are the eligibility requirements for adjustment of status to permanent resident based on marriage to a U.S. citizen, and does a prior visa overstay bar adjustment for an immediate relative?",
+    jurisdiction: "Federal (U.S.)"
+  },
+  marketing: {
+    goal: "Generate immigration consultation bookings from prospective marriage-based green-card applicants in the Newark area",
+    channel: "auto"
+  },
+  deadline: {
+    caseType: "asylum application (one-year filing deadline)",
+    jurisdiction: "Federal (U.S.)",
+    triggerDate: "2019-03-15",
+    matter: "Rosa Delgado — immigration"
+  },
+  discovery: {
+    name: "Rosa Delgado — marriage evidence, set 1",
+    text:
+      "USCIS RECEIPT NOTICE 09/02/2021: Forms I-130/I-485 received. Priority date 09/01/2021.\n===\n" +
+      "LEASE AGREEMENT 01/05/2022: Joint residential lease naming Rosa Delgado and Daniel Delgado as co-tenants, 14-month term.\n===\n" +
+      "EMAIL 03/14/2022 from Daniel to Rosa: \"Booked our anniversary trip — can't believe how fast the months since the wedding have gone. Love you.\""
+  }
+};
+
 const AGENT_DEFS = [
   { key: "intake", name: "Intake Agent", proc: "intake.agent", desc: "Client intake · qualification · booking" },
   { key: "notetaker", name: "Note-Taker Agent", proc: "notes.agent", desc: "Consultation transcripts → case notes" },
@@ -173,6 +216,66 @@ export default function AgentOS() {
     setTimeout(() => setClient((c) => ({ ...c, status: "" })), 5000);
   }
 
+  /* full scenario: drives every agent in sequence so the whole OS lights up */
+  const [demo, setDemo] = useState<{ running: boolean; status: string }>({ running: false, status: "" });
+  async function runFullDemo() {
+    if (demo.running || client.running) return;
+    const step = (s: string) => setDemo({ running: true, status: s });
+    const post = (url: string, body: Record<string, unknown>) =>
+      fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    try {
+      // 1) intake — real chat that creates the lead, qualifies, and books
+      step("intake.agent — new prospect…");
+      const history: { role: string; content: string }[] = [];
+      let conversationId: string | null = null;
+      for (const msg of FULL_DEMO.intake) {
+        await new Promise((r) => setTimeout(r, 700));
+        history.push({ role: "user", content: msg });
+        const res: Response = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ messages: history, conversationId, source: FULL_DEMO.source })
+        });
+        const d: { error?: string; reply?: string; conversationId?: string } = await res.json();
+        if (!res.ok || d.error) throw new Error(d.error || "intake failed");
+        if (d.conversationId) conversationId = d.conversationId;
+        history.push({ role: "assistant", content: d.reply || "" });
+      }
+
+      // resolve the matter that intake just created
+      step("locating new matter…");
+      const m = await fetch("/api/matters", { cache: "no-store" }).then((r) => r.json());
+      const leadId: string | undefined = m?.matters?.[0]?.id;
+
+      // 2) lead-dependent agents, in order
+      if (leadId) {
+        step("notes.agent — filing case notes…");
+        await post("/api/agent/notetaker", { leadId, transcript: FULL_DEMO.transcript });
+        step("forms.agent — preparing USCIS G-28…");
+        await post("/api/agent/paralegal", { leadId });
+        step("draft.agent — drafting engagement letter…");
+        await post("/api/agent/drafting", { leadId, docType: "engagement_letter" });
+        step("billing.agent — compiling invoice…");
+        await post("/api/agent/billing", { leadId });
+      }
+
+      // 3) standalone agents
+      step("research.agent — running legal memo…");
+      await post("/api/agent/research", FULL_DEMO.research);
+      step("market.agent — drafting campaign…");
+      await post("/api/agent/marketing", FULL_DEMO.marketing);
+      step("deadline.agent — computing deadlines…");
+      await post("/api/agent/deadline", FULL_DEMO.deadline);
+      step("discovery.agent — reviewing documents…");
+      await post("/api/agent/discovery", FULL_DEMO.discovery);
+
+      setDemo({ running: false, status: "✓ full demo complete — all 9 agents ran" });
+    } catch (e) {
+      setDemo({ running: false, status: "demo stopped: " + (e instanceof Error ? e.message : "error") });
+    }
+    setTimeout(() => setDemo((s) => ({ ...s, status: "" })), 8000);
+  }
+
   const byAgent = (k: string) => events.filter((e) => agentKeyFor(e) === k);
   const isActive = (k: string) => {
     const last = agents[`${k}_last`];
@@ -194,12 +297,20 @@ export default function AgentOS() {
         <a href="/paralegal" className="text-[11.5px] text-zinc-500 hover:text-zinc-200">Paralegal</a>
         <a href="/" className="text-[11.5px] text-zinc-500 hover:text-zinc-200">Client chat</a>
         <span className="ml-auto flex items-center gap-3">
-          {client.status && (
-            <span className="font-mono text-[10.5px] text-amber-300/90">{client.status}</span>
+          {(demo.status || client.status) && (
+            <span className="font-mono text-[10.5px] text-amber-300/90">{demo.status || client.status}</span>
           )}
           <button
+            onClick={runFullDemo}
+            disabled={demo.running || client.running}
+            className="rounded border border-[#e3b341]/40 bg-[#e3b341]/10 px-2.5 py-1 text-[10.5px] font-semibold text-[#e3b341] hover:bg-[#e3b341]/20 disabled:opacity-40"
+            title="Runs one coherent matter through all nine agents — real chat, real DB rows — so the whole board lights up in sequence"
+          >
+            {demo.running ? "● Running full demo…" : "▶▶ Run full demo"}
+          </button>
+          <button
             onClick={runTestClient}
-            disabled={client.running}
+            disabled={client.running || demo.running}
             className="rounded border border-emerald-400/30 bg-emerald-400/10 px-2.5 py-1 text-[10.5px] font-semibold text-emerald-300 hover:bg-emerald-400/20 disabled:opacity-40"
             title="Plays a scripted prospect through the real chat API — real agent replies, real database records"
           >

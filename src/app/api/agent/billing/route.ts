@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
         [leadId]
       );
       if (acts.length) {
-        context += "\n\nActivity log:\n" + acts.map((a) => `- ${a.created_at.slice(0, 10)} ${a.type}`).join("\n");
+        context += "\n\nActivity log:\n" + acts.map((a) => `- ${new Date(a.created_at).toISOString().slice(0, 10)} ${a.type}`).join("\n");
       }
     }
 

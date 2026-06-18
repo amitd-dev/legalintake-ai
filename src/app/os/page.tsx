@@ -221,8 +221,19 @@ export default function AgentOS() {
   async function runFullDemo() {
     if (demo.running || client.running) return;
     const step = (s: string) => setDemo({ running: true, status: s });
-    const post = (url: string, body: Record<string, unknown>) =>
-      fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    // resilient post: retry once after a short back-off so a transient hiccup doesn't skip an agent
+    const post = async (url: string, body: Record<string, unknown>) => {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const r = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+          if (r.ok) return true;
+        } catch {
+          /* retry */
+        }
+        await new Promise((res) => setTimeout(res, 2000));
+      }
+      return false;
+    };
     try {
       // 1) intake — real chat that creates the lead, qualifies, and books
       step("intake.agent — new prospect…");
@@ -261,11 +272,11 @@ export default function AgentOS() {
 
       // 3) standalone agents
       step("research.agent — running legal memo…");
-      await post("/api/agent/research", FULL_DEMO.research);
+      await post("/api/agent/research", { ...FULL_DEMO.research, fast: true });
       step("market.agent — drafting campaign…");
       await post("/api/agent/marketing", FULL_DEMO.marketing);
       step("deadline.agent — computing deadlines…");
-      await post("/api/agent/deadline", FULL_DEMO.deadline);
+      await post("/api/agent/deadline", { ...FULL_DEMO.deadline, fast: true });
       step("discovery.agent — reviewing documents…");
       await post("/api/agent/discovery", FULL_DEMO.discovery);
 

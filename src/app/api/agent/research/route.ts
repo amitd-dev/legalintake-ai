@@ -37,8 +37,11 @@ export async function POST(req: NextRequest) {
     }
 
     const userMsg = `Jurisdiction: ${jurisdiction}\n\nResearch question: ${question}`;
+    // `fast` skips web search (used by the demo runner) so the call stays well under the function time limit
+    const fast: boolean = body?.fast === true;
     let reply: string;
     try {
+      if (fast) throw new Error("skip-web-search");
       // try with Anthropic server-side web search
       ({ reply } = await runAgent({
         system: SYSTEM,

@@ -221,16 +221,16 @@ export default function AgentOS() {
   async function runFullDemo() {
     if (demo.running || client.running) return;
     const step = (s: string) => setDemo({ running: true, status: s });
-    // resilient post: retry once after a short back-off so a transient hiccup doesn't skip an agent
+    // resilient post: up to 3 attempts with back-off so a transient hiccup under load doesn't skip an agent
     const post = async (url: string, body: Record<string, unknown>) => {
-      for (let attempt = 0; attempt < 2; attempt++) {
+      for (let attempt = 0; attempt < 3; attempt++) {
         try {
           const r = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
           if (r.ok) return true;
         } catch {
           /* retry */
         }
-        await new Promise((res) => setTimeout(res, 2000));
+        await new Promise((res) => setTimeout(res, 3000));
       }
       return false;
     };

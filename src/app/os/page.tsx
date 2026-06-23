@@ -92,6 +92,20 @@ const AGENT_DEFS = [
   { key: "discovery", name: "Discovery Agent", proc: "discovery.agent", desc: "Document review · findings · chronology" }
 ] as const;
 
+/* Ordered steps for the full-demo progress checklist overlay. */
+type StepState = "pending" | "running" | "done" | "failed";
+const DEMO_STEPS: { key: string; proc: string; label: string }[] = [
+  { key: "intake", proc: "intake.agent", label: "Qualify & book the prospect" },
+  { key: "notetaker", proc: "notes.agent", label: "File consultation notes" },
+  { key: "paralegal", proc: "forms.agent", label: "Prepare USCIS Form G-28" },
+  { key: "drafting", proc: "draft.agent", label: "Draft engagement letter" },
+  { key: "billing", proc: "billing.agent", label: "Compile invoice" },
+  { key: "research", proc: "research.agent", label: "Run legal research memo" },
+  { key: "marketing", proc: "market.agent", label: "Draft marketing campaign" },
+  { key: "deadline", proc: "deadline.agent", label: "Compute SOL & deadlines" },
+  { key: "discovery", proc: "discovery.agent", label: "Review discovery documents" }
+];
+
 function agentKeyFor(e: Ev): string {
   if (e.type === "note_recorded") return "notetaker";
   if (e.type === "research_memo") return "research";
@@ -99,6 +113,7 @@ function agentKeyFor(e: Ev): string {
   if (e.type === "invoice_drafted") return "billing";
   if (e.type === "deadline_tracked") return "deadline";
   if (e.type === "discovery_reviewed") return "discovery";
+  if (e.type === "agent_handoff") return String((e.payload as Record<string, unknown>).from || "intake");
   if (e.type === "document_generated") {
     return (e.payload as Record<string, unknown>).agent === "drafting" ? "drafting" : "paralegal";
   }
@@ -121,6 +136,7 @@ function line(e: Ev): string {
     case "invoice_drafted": return `invoice drafted — ${p.name || "client"} · $${Number(p.total || 0).toLocaleString()} · ${p.entries ?? 0} entries`;
     case "deadline_tracked": return p.escalation ? `DEADLINE ${String(p.alert_level || "").toUpperCase()} — ${p.type || ""} · ${p.days_remaining}d` : `deadlines computed — ${p.matter || ""} · ${p.count ?? 0} tracked${p.soonest != null ? ` · soonest ${p.soonest}d` : ""}`;
     case "discovery_reviewed": return `review complete — ${p.name || "batch"} · ${p.docs ?? 0} docs · ${p.findings ?? 0} findings`;
+    case "agent_handoff": return `↪ handed off to ${p.to} — ${String(p.reason || "").slice(0, 70)}`;
     default: return e.type.replaceAll("_", " ");
   }
 }
@@ -216,75 +232,100 @@ export default function AgentOS() {
     setTimeout(() => setClient((c) => ({ ...c, status: "" })), 5000);
   }
 
-  /* full scenario: drives every agent in sequence so the whole OS lights up */
+  /* full scenario: drives every agent in sequence so the whole OS lights up,
+     with a live progress checklist and per-call timeouts so nothing can hang */
   const [demo, setDemo] = useState<{ running: boolean; status: string }>({ running: false, status: "" });
+  const [steps, setSteps] = useState<Record<string, StepState>>({});
+  const setStep = (k: string, s: StepState) => setSteps((p) => ({ ...p, [k]: s }));
+
   async function runFullDemo() {
     if (demo.running || client.running) return;
-    const step = (s: string) => setDemo({ running: true, status: s });
-    // resilient post: up to 3 attempts with back-off so a transient hiccup under load doesn't skip an agent
-    const post = async (url: string, body: Record<string, unknown>) => {
+    setSteps(Object.fromEntries(DEMO_STEPS.map((s) => [s.key, "pending"])));
+    setDemo({ running: true, status: "starting…" });
+
+    // one POST with up to 3 tries and a hard timeout per try — a slow/hung agent can never freeze the run
+    const post = async (url: string, body: Record<string, unknown>, timeoutMs = 45000) => {
       for (let attempt = 0; attempt < 3; attempt++) {
+        const ctrl = new AbortController();
+        const to = setTimeout(() => ctrl.abort(), timeoutMs);
         try {
-          const r = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+          const r = await fetch(url, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(body),
+            signal: ctrl.signal
+          });
+          clearTimeout(to);
           if (r.ok) return true;
         } catch {
-          /* retry */
+          clearTimeout(to);
         }
-        await new Promise((res) => setTimeout(res, 3000));
+        await new Promise((res) => setTimeout(res, 2500));
       }
       return false;
     };
+
+    // run one named step: mark running, execute, mark done/failed
+    const run = async (key: string, fn: () => Promise<boolean>) => {
+      setStep(key, "running");
+      setDemo({ running: true, status: `${DEMO_STEPS.find((s) => s.key === key)?.proc}…` });
+      const ok = await fn();
+      setStep(key, ok ? "done" : "failed");
+      return ok;
+    };
+
     try {
       // 1) intake — real chat that creates the lead, qualifies, and books
-      step("intake.agent — new prospect…");
-      const history: { role: string; content: string }[] = [];
-      let conversationId: string | null = null;
-      for (const msg of FULL_DEMO.intake) {
-        await new Promise((r) => setTimeout(r, 700));
-        history.push({ role: "user", content: msg });
-        const res: Response = await fetch("/api/chat", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ messages: history, conversationId, source: FULL_DEMO.source })
-        });
-        const d: { error?: string; reply?: string; conversationId?: string } = await res.json();
-        if (!res.ok || d.error) throw new Error(d.error || "intake failed");
-        if (d.conversationId) conversationId = d.conversationId;
-        history.push({ role: "assistant", content: d.reply || "" });
-      }
+      await run("intake", async () => {
+        const history: { role: string; content: string }[] = [];
+        let conversationId: string | null = null;
+        for (const msg of FULL_DEMO.intake) {
+          await new Promise((r) => setTimeout(r, 700));
+          history.push({ role: "user", content: msg });
+          const res: Response = await fetch("/api/chat", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ messages: history, conversationId, source: FULL_DEMO.source })
+          });
+          const d: { error?: string; reply?: string; conversationId?: string } = await res.json();
+          if (!res.ok || d.error) return false;
+          if (d.conversationId) conversationId = d.conversationId;
+          history.push({ role: "assistant", content: d.reply || "" });
+        }
+        return true;
+      });
 
-      // resolve the matter that intake just created
-      step("locating new matter…");
+      // resolve the matter intake just created
       const m = await fetch("/api/matters", { cache: "no-store" }).then((r) => r.json());
       const leadId: string | undefined = m?.matters?.[0]?.id;
 
-      // 2) lead-dependent agents, in order
+      // 2) lead-dependent agents. The Note-Taker autonomously hands off to the
+      //    Paralegal, which hands off to Drafting — one call, three agents, no clicks.
       if (leadId) {
-        step("notes.agent — filing case notes…");
-        await post("/api/agent/notetaker", { leadId, transcript: FULL_DEMO.transcript });
-        step("forms.agent — preparing USCIS G-28…");
-        await post("/api/agent/paralegal", { leadId });
-        step("draft.agent — drafting engagement letter…");
-        await post("/api/agent/drafting", { leadId, docType: "engagement_letter" });
-        step("billing.agent — compiling invoice…");
-        await post("/api/agent/billing", { leadId });
+        setStep("notetaker", "running");
+        setStep("paralegal", "running");
+        setStep("drafting", "running");
+        setDemo({ running: true, status: "notes.agent ↪ forms.agent ↪ draft.agent (auto-handoff)…" });
+        const chainOk = await post("/api/agent/notetaker", { leadId, transcript: FULL_DEMO.transcript }, 90000);
+        setStep("notetaker", chainOk ? "done" : "failed");
+        setStep("paralegal", chainOk ? "done" : "failed");
+        setStep("drafting", chainOk ? "done" : "failed");
+        await run("billing", () => post("/api/agent/billing", { leadId }));
+      } else {
+        ["notetaker", "paralegal", "drafting", "billing"].forEach((k) => setStep(k, "failed"));
       }
 
-      // 3) standalone agents
-      step("research.agent — running legal memo…");
-      await post("/api/agent/research", { ...FULL_DEMO.research, fast: true });
-      step("market.agent — drafting campaign…");
-      await post("/api/agent/marketing", FULL_DEMO.marketing);
-      step("deadline.agent — computing deadlines…");
-      await post("/api/agent/deadline", { ...FULL_DEMO.deadline, fast: true });
-      step("discovery.agent — reviewing documents…");
-      await post("/api/agent/discovery", FULL_DEMO.discovery);
+      // 3) standalone agents (research/deadline use the fast, no-web-search path for reliability)
+      await run("research", () => post("/api/agent/research", { ...FULL_DEMO.research, fast: true }));
+      await run("marketing", () => post("/api/agent/marketing", FULL_DEMO.marketing));
+      await run("deadline", () => post("/api/agent/deadline", { ...FULL_DEMO.deadline, fast: true }));
+      await run("discovery", () => post("/api/agent/discovery", FULL_DEMO.discovery));
 
-      setDemo({ running: false, status: "✓ full demo complete — all 9 agents ran" });
-    } catch (e) {
-      setDemo({ running: false, status: "demo stopped: " + (e instanceof Error ? e.message : "error") });
+      setDemo({ running: false, status: "✓ full demo complete" });
+    } catch {
+      setDemo({ running: false, status: "demo stopped" });
     }
-    setTimeout(() => setDemo((s) => ({ ...s, status: "" })), 8000);
+    setTimeout(() => setDemo((s) => ({ ...s, status: "" })), 12000);
   }
 
   const byAgent = (k: string) => events.filter((e) => agentKeyFor(e) === k);
@@ -334,6 +375,36 @@ export default function AgentOS() {
           <MenuClock />
         </span>
       </div>
+
+      {/* full-demo progress checklist */}
+      {(demo.running || Object.keys(steps).length > 0) && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-b border-white/[0.08] bg-[#0d0d0f]/80 px-4 py-2">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#e3b341]">Full demo</span>
+          {DEMO_STEPS.map((s, i) => {
+            const st: StepState = steps[s.key] || "pending";
+            return (
+              <span key={s.key} className="flex items-center gap-1.5 text-[10.5px]">
+                <span
+                  className={
+                    st === "done"
+                      ? "text-emerald-400"
+                      : st === "running"
+                        ? "animate-pulse text-amber-300"
+                        : st === "failed"
+                          ? "text-red-400"
+                          : "text-zinc-600"
+                  }
+                >
+                  {st === "done" ? "✓" : st === "running" ? "●" : st === "failed" ? "✕" : "○"}
+                </span>
+                <span className={st === "pending" ? "text-zinc-600" : st === "running" ? "font-medium text-zinc-100" : "text-zinc-400"}>
+                  {i + 1}. {s.proc.replace(".agent", "")}
+                </span>
+              </span>
+            );
+          })}
+        </div>
+      )}
 
       {/* desktop */}
       <main className="grid flex-1 grid-cols-1 gap-4 p-4 lg:grid-cols-2 xl:grid-cols-4">

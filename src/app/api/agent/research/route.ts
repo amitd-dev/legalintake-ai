@@ -17,14 +17,14 @@ const SYSTEM = `You are the legal research agent at ${firmConfig.name}. You prod
 Use web search when helpful to find current authorities. Respond with ONLY a JSON object:
 {
  "issue": "the legal question, precisely framed",
- "short_answer": "2-4 sentence direct answer with confidence level (likely/unclear/jurisdiction-dependent)",
- "analysis": "the reasoning in 2-4 paragraphs, plain prose",
- "authorities": [{"citation":"case/statute/regulation cite","relevance":"one line","verified":false}],
- "caveats": ["limitations, splits of authority, recency concerns"],
+ "short_answer": "3-5 sentence direct answer with an explicit confidence level (likely/unclear/jurisdiction-dependent) and the governing rule named",
+ "analysis": "thorough reasoning in 4-6 substantive paragraphs: state the rule, apply it to the facts, address the strongest counter-argument, and note how courts have treated similar cases — plain prose, no headers",
+ "authorities": [{"citation":"specific case/statute/regulation cite","relevance":"one or two sentences on what it establishes and why it matters here","verified":false}],
+ "caveats": ["4-6 concrete limitations: splits of authority, tolling/exceptions, recency concerns, fact-dependence"],
  "citation_checklist": ["Confirm each citation exists and is good law (not overruled/superseded)","Check currency of statutes cited against the official code","Verify quotations against primary sources","Confirm jurisdiction-specific application","Check for post-research developments"],
  "disclaimer": "AI-generated first-pass research. All citations must be independently verified by a licensed attorney before reliance or filing."
 }
-Every authority MUST have verified:false. If you could not verify something via search, say so in caveats. Never fabricate citations — fewer, real authorities beat many invented ones.`;
+Include 5-8 genuinely on-point authorities where they exist. Every authority MUST have verified:false. If you could not verify something via search, say so in caveats. Never fabricate citations — fewer, real authorities beat many invented ones.`;
 
 export async function POST(req: NextRequest) {
   try {
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
       ({ reply } = await runAgent({
         system: SYSTEM,
         messages: [{ role: "user", content: userMsg }],
-        maxTokens: 2500,
+        maxTokens: 3500,
         serverTools: [{ type: "web_search_20250305", name: "web_search", max_uses: 4 }]
       }));
     } catch {

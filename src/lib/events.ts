@@ -15,6 +15,7 @@ export type EventType =
   | "invoice_drafted"
   | "deadline_tracked"
   | "discovery_reviewed"
+  | "agent_handoff"
   | "agent_error";
 
 export async function logEvent(type: EventType, payload: Record<string, unknown>): Promise<void> {

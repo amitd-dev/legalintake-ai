@@ -29,6 +29,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => null);
     const leadId: string = body?.leadId;
+    const viaHandoff: boolean = body?.viaHandoff === true;
     if (!leadId) return NextResponse.json({ error: "leadId required" }, { status: 400 });
 
     const [lead] = await query<Record<string, unknown>>("select * from leads where id=$1", [leadId]);
@@ -76,6 +77,27 @@ export async function POST(req: NextRequest) {
       name: lead.name,
       missing_for_filing: mapped.missing_for_filing || []
     });
+
+    // AUTONOMOUS HANDOFF: when reached via the note-taker chain, the Paralegal
+    // hands off to the Drafting agent to onboard the new client with an engagement letter.
+    if (viaHandoff) {
+      await logEvent("agent_handoff", {
+        from: "paralegal",
+        to: "drafting",
+        lead_id: leadId,
+        name: lead.name,
+        reason: "G-28 prepared — dispatching Drafting agent to produce the client engagement letter."
+      });
+      try {
+        await fetch(`${origin}/api/agent/drafting`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ leadId, docType: "engagement_letter", viaHandoff: true })
+        });
+      } catch (e) {
+        console.error("paralegal→drafting handoff failed", e);
+      }
+    }
 
     return NextResponse.json({
       ok: true,

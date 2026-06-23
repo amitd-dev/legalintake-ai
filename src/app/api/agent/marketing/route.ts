@@ -74,7 +74,7 @@ Respond with ONLY a JSON object:
  "kpis": ["what to measure"],
  "disclaimer": "AI-drafted marketing concept. Review for accuracy and compliance with applicable bar advertising rules before publishing. Attorney Advertising. Prior results do not guarantee a similar outcome."
 }
-Produce 3-5 ad variants across the channels you recommend. Never invent firm facts (awards, stats, attorney names beyond those configured); keep claims to services offered and the free-consultation intake. If the conversion data is thin, say so in data_insight and recommend a test budget.`;
+Produce 5-6 distinct ad variants across the channels you recommend (vary the angle: urgency, empathy, expertise, free-consultation, social proof of process). data_insight should be 2-3 sentences citing the actual numbers. channel_plan should cover every channel you recommend with a budget share that sums to 100%. Never invent firm facts (awards, stats, attorney names beyond those configured); keep claims to services offered and the free-consultation intake. If the conversion data is thin, say so in data_insight and recommend a test budget.`;
 
 export async function POST(req: NextRequest) {
   try {
@@ -101,7 +101,7 @@ export async function POST(req: NextRequest) {
     const { reply } = await runAgent({
       system: SYSTEM,
       messages: [{ role: "user", content: userMsg }],
-      maxTokens: 2500
+      maxTokens: 3200
     });
 
     const match = reply.match(/\{[\s\S]*\}/);

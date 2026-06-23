@@ -23,7 +23,7 @@ Respond with ONLY a JSON object:
  "privilege_flags": ["any documents/passages that may be privileged or need a closer privilege review"],
  "disclaimer": "AI-generated first-pass review of the provided text only. An attorney must verify relevance, completeness, privilege, and that nothing material was missed before any production or reliance."
 }
-relevance is 0.0-1.0. Order findings by relevance, highest first. If the text is thin or ambiguous, produce fewer findings and say so in the summary. Flag anything that looks privileged.`;
+relevance is 0.0-1.0. Order findings by relevance, highest first. Produce 5-8 findings where the documents support them (fewer only if the text is genuinely thin — say so in the summary). Build a chronology covering every dated event you can identify, in order. Flag anything that looks privileged.`;
 
 export async function POST(req: NextRequest) {
   try {
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
     const { reply } = await runAgent({
       system: SYSTEM,
       messages: [{ role: "user", content: userMsg }],
-      maxTokens: 2800
+      maxTokens: 3600
     });
 
     const match = reply.match(/\{[\s\S]*\}/);

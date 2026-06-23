@@ -34,7 +34,7 @@ Respond with ONLY a JSON object:
  "notes": "any assumptions or gaps the reviewing attorney should check",
  "disclaimer": "AI-drafted billing. Attorney must review entries for accuracy, reasonableness, and compliance with fee agreements and billing guidelines before sending."
 }
-amount must equal hours*rate for each item; subtotal and total must equal the sum of amounts (no tax unless stated).`;
+Produce 6-10 entries that realistically span the matter lifecycle (e.g. initial intake call, conflicts check, consultation, file/record review, legal research, document drafting, client correspondence, calendaring), each on its own date. amount must equal hours*rate for each item; subtotal and total must equal the sum of amounts (no tax unless stated).`;
 
 export async function POST(req: NextRequest) {
   try {
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
     const { reply } = await runAgent({
       system: SYSTEM,
       messages: [{ role: "user", content: userMsg }],
-      maxTokens: 2000
+      maxTokens: 3000
     });
 
     const match = reply.match(/\{[\s\S]*\}/);

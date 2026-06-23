@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     const { reply } = await runAgent({
       system: SYSTEM,
       messages: [{ role: "user", content: "Consultation transcript:\n\n" + transcript }],
-      maxTokens: 1500
+      maxTokens: 2200
     });
     const match = reply.match(/\{[\s\S]*\}/);
     if (!match) throw new Error("note-taker returned no JSON");
@@ -55,6 +55,29 @@ export async function POST(req: NextRequest) {
       case_type: structured.case_type,
       forms_needed: structured.forms_needed
     });
+
+    // AUTONOMOUS HANDOFF: if the notes flag that a USCIS G-28 is needed, the
+    // Note-Taker hands the matter to the Paralegal agent on its own — no human click.
+    const forms: string[] = Array.isArray(structured.forms_needed) ? structured.forms_needed : [];
+    const needsG28 = forms.some((f) => /g[-\s]?28/i.test(String(f)));
+    if (needsG28) {
+      await logEvent("agent_handoff", {
+        from: "notetaker",
+        to: "paralegal",
+        lead_id: leadId,
+        name: lead?.name,
+        reason: `Consultation notes flag forms needed (${forms.join(", ")}) — dispatching Paralegal to prepare the G-28.`
+      });
+      try {
+        await fetch(`${req.nextUrl.origin}/api/agent/paralegal`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ leadId, viaHandoff: true })
+        });
+      } catch (e) {
+        console.error("notetaker→paralegal handoff failed", e);
+      }
+    }
 
     return NextResponse.json({ ok: true, noteId: rows[0].id, structured });
   } catch (e) {

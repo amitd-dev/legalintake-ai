@@ -25,7 +25,7 @@ Respond with ONLY a JSON object:
  "assumptions": ["what you assumed about the trigger date, tolling, etc."],
  "disclaimer": "AI-computed dates are a first pass only. Every deadline — especially the statute of limitations — must be independently verified by a licensed attorney against the controlling rules and any tolling before being relied upon."
 }
-Never invent a precise date you cannot justify; if the period is uncertain, give your best estimate and explain the uncertainty in basis and assumptions.`;
+Identify 6-10 relevant deadlines where they apply (statute of limitations, notice-of-claim windows, answer/response dates, expert disclosure, discovery cutoffs, and any jurisdiction-specific pre-suit requirements). Never invent a precise date you cannot justify; if the period is uncertain, give your best estimate and explain the uncertainty in basis and assumptions.`;
 
 export async function POST(req: NextRequest) {
   try {
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
       ({ reply } = await runAgent({
         system: SYSTEM,
         messages: [{ role: "user", content: userMsg }],
-        maxTokens: 1800,
+        maxTokens: 2600,
         serverTools: [{ type: "web_search_20250305", name: "web_search", max_uses: 3 }]
       }));
     } catch {

@@ -159,6 +159,7 @@ function agentFor(type: string): string {
   if (type === "invoice_drafted") return "BILLING";
   if (type === "deadline_tracked") return "DEADLINE";
   if (type === "discovery_reviewed") return "DISCOVERY";
+  if (type === "agent_handoff") return "ORCHESTRATION";
   return "INTAKE";
 }
 
@@ -243,6 +244,10 @@ function eventMeta(type: string, p: Record<string, unknown>) {
         : { tag: "DEADLINE", tagCls: "bg-orange-400/10 text-orange-300", text: `Deadlines computed — ${p.matter ?? ""} · ${p.count ?? 0} tracked`, right: null };
     case "discovery_reviewed":
       return { tag: "DISCOVERY", tagCls: "bg-sky-400/10 text-sky-300", text: `Review — ${p.name ?? "batch"} · ${p.docs ?? 0} docs · ${p.findings ?? 0} findings`, right: null };
+    case "agent_handoff": {
+      const nm: Record<string, string> = { intake: "Intake", notetaker: "Note-Taker", paralegal: "Paralegal", drafting: "Drafting", research: "Research", marketing: "Marketing", billing: "Billing", deadline: "Deadline", discovery: "Discovery" };
+      return { tag: "HANDOFF", tagCls: "bg-indigo-400/15 text-indigo-300", text: `${nm[String(p.from)] ?? p.from} → ${nm[String(p.to)] ?? p.to}: ${p.reason ?? ""}`, right: null };
+    }
     default:
       return { tag: type.slice(0, 9).toUpperCase(), tagCls: "bg-zinc-400/10 text-zinc-400", text: type.replaceAll("_", " "), right: null };
   }

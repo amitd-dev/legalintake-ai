@@ -54,9 +54,12 @@ export async function POST(req: NextRequest) {
       }));
     } catch {
       ({ reply } = await runAgent({
-        system: SYSTEM + "\n\nNOTE: web search unavailable — rely on established knowledge and flag currency limits in assumptions.",
+        system:
+          SYSTEM +
+          "\n\nNOTE: web search unavailable — rely on established knowledge and flag currency limits in assumptions." +
+          (fast ? "\nFAST MODE: list 5-7 key deadlines concisely. Ensure the ENTIRE JSON object is complete and valid (no truncation)." : ""),
         messages: [{ role: "user", content: userMsg }],
-        maxTokens: 1800
+        maxTokens: fast ? 2200 : 1800
       }));
     }
 

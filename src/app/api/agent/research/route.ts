@@ -51,11 +51,14 @@ export async function POST(req: NextRequest) {
       }));
     } catch {
       // account may not have web search enabled — degrade gracefully. In fast (demo)
-      // mode keep the token budget lean so the call finishes well inside the time limit.
+      // mode, keep the memo concise so the full JSON object completes well inside the budget.
       ({ reply } = await runAgent({
-        system: SYSTEM + "\n\nNOTE: web search unavailable — rely on established knowledge, flag currency limits prominently in caveats.",
+        system:
+          SYSTEM +
+          "\n\nNOTE: web search unavailable — rely on established knowledge, flag currency limits prominently in caveats." +
+          (fast ? "\nFAST MODE: be concise — 2-3 analysis paragraphs and 3-5 key authorities. Ensure the ENTIRE JSON object is complete and valid (no truncation)." : ""),
         messages: [{ role: "user", content: userMsg }],
-        maxTokens: fast ? 1800 : 2500
+        maxTokens: fast ? 2600 : 2500
       }));
     }
 

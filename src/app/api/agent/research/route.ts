@@ -50,11 +50,12 @@ export async function POST(req: NextRequest) {
         serverTools: [{ type: "web_search_20250305", name: "web_search", max_uses: 4 }]
       }));
     } catch {
-      // account may not have web search enabled — degrade gracefully
+      // account may not have web search enabled — degrade gracefully. In fast (demo)
+      // mode keep the token budget lean so the call finishes well inside the time limit.
       ({ reply } = await runAgent({
         system: SYSTEM + "\n\nNOTE: web search unavailable — rely on established knowledge, flag currency limits prominently in caveats.",
         messages: [{ role: "user", content: userMsg }],
-        maxTokens: 2500
+        maxTokens: fast ? 1800 : 2500
       }));
     }
 

@@ -243,8 +243,9 @@ export default function AgentOS() {
     setSteps(Object.fromEntries(DEMO_STEPS.map((s) => [s.key, "pending"])));
     setDemo({ running: true, status: "starting…" });
 
-    // one POST with up to 3 tries and a hard timeout per try — a slow/hung agent can never freeze the run
-    const post = async (url: string, body: Record<string, unknown>, timeoutMs = 45000) => {
+    // one POST with up to 3 tries and a hard timeout per try — a slow/hung agent can never freeze the run.
+    // 58s sits just under the 60s serverless function cap, so we don't abort a call the function would still finish.
+    const post = async (url: string, body: Record<string, unknown>, timeoutMs = 58000) => {
       for (let attempt = 0; attempt < 3; attempt++) {
         const ctrl = new AbortController();
         const to = setTimeout(() => ctrl.abort(), timeoutMs);
